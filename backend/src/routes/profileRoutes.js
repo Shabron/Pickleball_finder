@@ -9,6 +9,9 @@ router.get('/me', protect, getMyProfile);
 // PUT /api/profile/me — create or update my profile
 router.put('/me', protect, updateMyProfile);
 
+// POST /api/profile/me — alias for create/update my profile
+router.post('/me', protect, updateMyProfile);
+
 // DELETE /api/profile/me — delete my profile
 router.delete('/me', protect, deleteMyProfile);
 

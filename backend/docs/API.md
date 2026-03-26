@@ -300,6 +300,12 @@ curl -X PUT http://localhost:8081/api/profile/me \
 
 ---
 
+### `POST /api/profile/me`
+
+Alias for `PUT /api/profile/me` (create or update).
+
+---
+
 ### `GET /api/profile/:userId`
 
 View another user's public profile by their user ID.
@@ -338,6 +344,69 @@ curl -X DELETE http://localhost:8081/api/profile/me \
   "message": "Profile deleted successfully"
 }
 ```
+
+---
+
+## Posts
+
+### `GET /api/posts`
+
+Fetch posts for the feed. Supports optional filters via query params.
+
+**Query params** (all optional)
+- `state` (string)
+- `skillLevel` (`Beginner`, `Intermediate`, `Advanced`)
+- `playStyle` (`Singles`, `Doubles`, `Both`)
+- `status` (`Open`, `Closed`)
+- `page` (number, default `1`)
+- `limit` (number, default `20`)
+
+```bash
+curl http://localhost:8081/api/posts?state=Florida&skillLevel=Intermediate&page=1&limit=20
+```
+
+**Response** `200 OK`
+
+---
+
+### `POST /api/posts`
+
+Create a new post.
+
+```bash
+curl -X POST http://localhost:8081/api/posts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "title": "Looking for doubles partner",
+    "description": "Competitive but friendly. Weekday mornings work best.",
+    "state": "Florida",
+    "city": "Tampa",
+    "skillLevel": "Intermediate",
+    "playStyle": "Doubles",
+    "preferredTime": ["Mon AM", "Wed PM"],
+    "status": "Open"
+  }'
+```
+
+**Response** `201 Created`
+
+### `PUT /api/posts/:id`
+
+Update your own post.
+
+```bash
+curl -X PUT http://localhost:8081/api/posts/YOUR_POST_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "city": "Orlando",
+    "preferredTime": ["Tue AM", "Thu PM"],
+    "status": "Open"
+  }'
+```
+
+**Response** `200 OK`
 
 ---
 
