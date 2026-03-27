@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, SafeAreaView } from 'react-native';
+/**
+ * Dropdown — Accessible selection dropdown
+ *
+ * Theme-aware with surfaceContainerHighest background.
+ * Touch targets at least 56px for senior accessibility.
+ */
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Modal,
+  Pressable,
+  ViewStyle,
+} from 'react-native';
 import { ChevronDown, Check } from 'lucide-react-native';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { borderRadius, spacing, sizes } from '../../theme/spacing';
 
-interface Option {
+export interface DropdownOption {
   label: string;
   value: string;
 }
@@ -13,143 +27,158 @@ interface Option {
 interface DropdownProps {
   label?: string;
   placeholder?: string;
-  options: Option[];
-  value?: string;
+  options: DropdownOption[];
+  value: string;
   onSelect: (value: string) => void;
+  style?: ViewStyle;
 }
 
-export default function Dropdown({ label, placeholder = 'Select...', options, value, onSelect }: DropdownProps) {
-  const [modalVisible, setModalVisible] = useState(false);
-  
-  const selectedOption = options.find(o => o.value === value);
+export default function Dropdown({
+  label,
+  placeholder = 'Select...',
+  options,
+  value,
+  onSelect,
+  style,
+}: DropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { colors, typography } = useTheme();
 
-  const handleSelect = (val: string) => {
-    onSelect(val);
-    setModalVisible(false);
-  };
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  const handleSelect = useCallback(
+    (optValue: string) => {
+      onSelect(optValue);
+      setIsOpen(false);
+    },
+    [onSelect],
+  );
 
   return (
-    <View style={styles.wrapper}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      
-      <TouchableOpacity 
-        style={styles.container} 
-        onPress={() => setModalVisible(true)}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.text, !selectedOption && styles.placeholderText]}>
-          {selectedOption ? selectedOption.label : placeholder}
+    <View style={style}>
+      {label && (
+        <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.xs }]}>
+          {label}
         </Text>
-        <ChevronDown color={colors.textSecondary} size={20} />
+      )}
+
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setIsOpen(true)}
+        style={[
+          styles.trigger,
+          { backgroundColor: colors.surfaceContainerHighest },
+        ]}
+      >
+        <Text
+          style={[
+            typography.bodyLarge,
+            {
+              color: selectedOption ? colors.onSurface : colors.onSurfaceVariant,
+              flex: 1,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {selectedOption?.label || placeholder}
+        </Text>
+        <ChevronDown color={colors.onSurfaceVariant} size={sizes.iconDefault} />
       </TouchableOpacity>
 
       <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
       >
-        <SafeAreaView style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{label || 'Select an option'}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-            
+        <Pressable
+          style={styles.overlay}
+          onPress={() => setIsOpen(false)}
+        >
+          <View
+            style={[
+              styles.dropdownList,
+              { backgroundColor: colors.surfaceContainerLowest },
+            ]}
+          >
+            {label && (
+              <Text
+                style={[
+                  typography.titleMedium,
+                  { color: colors.onSurface, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+                ]}
+              >
+                {label}
+              </Text>
+            )}
             <FlatList
               data={options}
               keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.optionRow} 
-                  onPress={() => handleSelect(item.value)}
-                >
-                  <Text style={[styles.optionText, value === item.value && styles.selectedOptionText]}>
-                    {item.label}
-                  </Text>
-                  {value === item.value && <Check color={colors.primary} size={20} />}
-                </TouchableOpacity>
-              )}
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 400 }}
+              renderItem={({ item }) => {
+                const isSelected = item.value === value;
+                return (
+                  <TouchableOpacity
+                    onPress={() => handleSelect(item.value)}
+                    style={[
+                      styles.option,
+                      isSelected && { backgroundColor: colors.primaryContainer + '40' },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        typography.bodyLarge,
+                        {
+                          color: isSelected ? colors.primary : colors.onSurface,
+                          flex: 1,
+                          fontWeight: isSelected ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {isSelected && <Check color={colors.primary} size={sizes.iconSmall} />}
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
-        </SafeAreaView>
+        </Pressable>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: spacing.m,
-  },
-  label: {
-    ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  container: {
+  trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    minHeight: 50,
-    paddingHorizontal: spacing.m,
+    minHeight: sizes.touchTarget,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
   },
-  text: {
-    ...typography.body,
-    color: colors.text,
-  },
-  placeholderText: {
-    color: colors.textSecondary,
-  },
-  modalOverlay: {
+  overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxl,
   },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: spacing.xl,
+  dropdownList: {
+    borderRadius: borderRadius.xl,
+    paddingVertical: spacing.sm,
+    maxHeight: 500,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
   },
-  modalHeader: {
+  option: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  closeText: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: spacing.m,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  optionText: {
-    ...typography.body,
-    color: colors.text,
-  },
-  selectedOptionText: {
-    color: colors.primary,
-    fontWeight: '600',
+    minHeight: sizes.touchTargetMin,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
 });

@@ -1,109 +1,177 @@
+/**
+ * MyPostsScreen — User's own posts management
+ *
+ * Shows user's active/closed posts with management actions.
+ * Uses tonal layering, themed components, no border dividers.
+ */
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
-import { MoreVertical, Plus } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { Plus, Edit2, Trash2 } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
-import PartnerPostCard, { PartnerPostData } from '../../components/PartnerPostCard';
+import Card from '../../components/common/Card';
+import Avatar from '../../components/common/Avatar';
+import Badge from '../../components/common/Badge';
 import FAB from '../../components/common/FAB';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
-const MY_POSTS: PartnerPostData[] = [
+interface MyPost {
+  id: string;
+  title: string;
+  content: string;
+  status: 'Open' | 'Closed';
+  timeAgo: string;
+  responseCount: number;
+}
+
+const MY_POSTS: MyPost[] = [
   {
     id: '1',
-    name: 'Arthur S.',
-    level: '3.0',
-    timeAgo: 'Just now',
+    title: 'Looking for Doubles Partner',
     content: 'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts.',
+    status: 'Open',
+    timeAgo: 'Just now',
+    responseCount: 3,
   },
   {
     id: '2',
-    name: 'Arthur S.',
-    level: '3.0',
+    title: 'Casual Level 3.0 Play',
+    content: 'My Singles Post: Casual Level 3.0 play. Sarasota Area. Weekday mornings preferred.',
+    status: 'Open',
     timeAgo: '2 days ago',
-    content: 'My Singles Post: Casual Level 3.0 play. (Sarasota Area)',
+    responseCount: 1,
   },
 ];
 
-export default function MyPostsScreen() {
+export default function MyPostsScreen({ navigation }: any) {
+  const { colors, typography } = useTheme();
+
+  const renderPostItem = ({ item }: { item: MyPost }) => (
+    <Card elevation={2}>
+      {/* Status + Time */}
+      <View style={styles.postHeader}>
+        <Badge
+          label={item.status}
+          variant={item.status === 'Open' ? 'success' : 'surface'}
+        />
+        <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+          {item.timeAgo}
+        </Text>
+      </View>
+
+      {/* Title + Content */}
+      <Text style={[typography.titleMedium, { color: colors.onSurface, marginBottom: spacing.xs }]}>
+        {item.title}
+      </Text>
+      <Text
+        style={[typography.bodyLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}
+        numberOfLines={3}
+      >
+        {item.content}
+      </Text>
+
+      {/* Response Count */}
+      <Text style={[typography.labelMedium, { color: colors.secondary, marginBottom: spacing.md }]}>
+        {item.responseCount} response{item.responseCount !== 1 ? 's' : ''}
+      </Text>
+
+      {/* Actions */}
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: colors.secondaryContainer }]}
+          onPress={() => navigation.navigate('CreatePost', { postId: item.id })}
+        >
+          <Edit2 size={16} color={colors.onSecondaryContainer} />
+          <Text
+            style={[
+              typography.labelMedium,
+              { color: colors.onSecondaryContainer, marginLeft: spacing.xs },
+            ]}
+          >
+            Edit
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: colors.errorContainer + '60' }]}
+        >
+          <Trash2 size={16} color={colors.error} />
+          <Text
+            style={[
+              typography.labelMedium,
+              { color: colors.error, marginLeft: spacing.xs },
+            ]}
+          >
+            Delete
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Card>
+  );
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header />
-      
+    <ScreenWrapper>
+      <Header title="My Posts" />
+
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>My Posts ({MY_POSTS.length} Active)</Text>
+        <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
+          My Posts ({MY_POSTS.length} Active)
+        </Text>
       </View>
 
       <FlatList
         data={MY_POSTS}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        renderItem={({ item }) => (
-          <View style={styles.postWrapper}>
-            <View style={styles.postTypeWarning}>
-               <Text style={styles.postTypeText}>Looking for: {item.name}</Text>
-               <TouchableOpacity style={styles.manageButton}>
-                 <Text style={styles.manageButtonText}>Manage My Post</Text>
-               </TouchableOpacity>
-            </View>
-            <PartnerPostCard post={item} />
+        showsVerticalScrollIndicator={false}
+        renderItem={renderPostItem}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
+              You haven't posted yet.{'\n'}Tap + to find a partner!
+            </Text>
           </View>
-        )}
+        }
       />
 
-      <FAB icon={<Plus color="#FFF" size={24} />} onPress={() => {}} />
-    </SafeAreaView>
+      <FAB
+        icon={<Plus color={colors.surfaceContainerLowest} size={24} />}
+        onPress={() => navigation.navigate('CreatePost')}
+      />
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   headerContainer: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   listContainer: {
-    paddingHorizontal: spacing.s,
-    paddingBottom: 80,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 100,
   },
-  postWrapper: {
-    marginBottom: spacing.m,
-    position: 'relative',
-  },
-  postTypeWarning: {
-    backgroundColor: '#D6EAF8',
-    padding: spacing.s,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  postHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: -10, // overlap visually with card below
-    zIndex: 1,
+    marginBottom: spacing.md,
   },
-  postTypeText: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.text,
-    flex: 1,
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
-  manageButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: 12,
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
   },
-  manageButtonText: {
-    ...typography.caption,
-    color: '#FFF',
-    fontWeight: '600',
+  emptyState: {
+    paddingTop: spacing.giant,
+    alignItems: 'center',
   },
 });

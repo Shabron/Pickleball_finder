@@ -1,10 +1,16 @@
+/**
+ * Button — Primary action component
+ *
+ * Supports primary, secondary, outline, ghost, and error variants.
+ * All touch targets are at least 56px (senior-friendly per Stitch spec).
+ * Fully round shape per "Sunlit Court" design system.
+ */
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { borderRadius, sizes } from '../../theme/spacing';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'error';
 
 interface ButtonProps {
   title: string;
@@ -14,6 +20,8 @@ interface ButtonProps {
   loading?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  /** Optional icon to render before the title */
+  icon?: React.ReactNode;
 }
 
 export default function Button({
@@ -24,52 +32,79 @@ export default function Button({
   loading = false,
   style,
   textStyle,
+  icon,
 }: ButtonProps) {
-  const getContainerStyle = () => {
-    switch (variant) {
-      case 'primary':
-        return styles.primaryContainer;
-      case 'secondary':
-        return styles.secondaryContainer;
-      case 'outline':
-        return styles.outlineContainer;
-      case 'ghost':
-        return styles.ghostContainer;
-      default:
-        return styles.primaryContainer;
-    }
+  const { colors, typography } = useTheme();
+
+  const variantConfig = {
+    primary: {
+      bg: colors.primary,
+      text: colors.surfaceContainerLowest,
+      border: colors.transparent,
+      loadingColor: colors.surfaceContainerLowest,
+    },
+    secondary: {
+      bg: colors.secondaryContainer,
+      text: colors.onSecondaryContainer,
+      border: colors.transparent,
+      loadingColor: colors.onSecondaryContainer,
+    },
+    outline: {
+      bg: colors.transparent,
+      text: colors.primary,
+      border: colors.outline,
+      loadingColor: colors.primary,
+    },
+    ghost: {
+      bg: colors.transparent,
+      text: colors.onSurface,
+      border: colors.transparent,
+      loadingColor: colors.onSurface,
+    },
+    error: {
+      bg: colors.error,
+      text: colors.onError,
+      border: colors.transparent,
+      loadingColor: colors.onError,
+    },
   };
 
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'primary':
-      case 'secondary':
-        return styles.lightText;
-      case 'outline':
-      case 'ghost':
-        return styles.darkText;
-      default:
-        return styles.lightText;
-    }
-  };
+  const config = variantConfig[variant];
 
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
+      activeOpacity={0.7}
       style={[
         styles.container,
-        getContainerStyle(),
-        disabled && styles.disabledContainer,
+        {
+          backgroundColor: disabled ? colors.surfaceContainerHighest : config.bg,
+          borderColor: disabled ? colors.outlineVariant : config.border,
+          borderWidth: variant === 'outline' ? 1.5 : 0,
+        },
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : '#FFF'} />
+        <ActivityIndicator color={config.loadingColor} size="small" />
       ) : (
-        <Text style={[styles.text, getTextStyle(), disabled && styles.disabledText, textStyle]}>
-          {title}
-        </Text>
+        <>
+          {icon && <>{icon}</>}
+          <Text
+            style={[
+              typography.titleSmall,
+              styles.text,
+              {
+                color: disabled ? colors.outlineVariant : config.text,
+                marginLeft: icon ? 8 : 0,
+              },
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -77,42 +112,14 @@ export default function Button({
 
 const styles = StyleSheet.create({
   container: {
-    height: 50,
+    height: sizes.touchTarget,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
-    paddingHorizontal: spacing.l,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 24,
     flexDirection: 'row',
   },
-  primaryContainer: {
-    backgroundColor: colors.primary,
-  },
-  secondaryContainer: {
-    backgroundColor: colors.secondary,
-  },
-  outlineContainer: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  ghostContainer: {
-    backgroundColor: 'transparent',
-  },
-  disabledContainer: {
-    backgroundColor: colors.border,
-    borderColor: colors.border,
-  },
   text: {
-    ...typography.body,
-    fontWeight: '600',
-  },
-  lightText: {
-    color: '#FFF',
-  },
-  darkText: {
-    color: colors.primary,
-  },
-  disabledText: {
-    color: colors.textSecondary,
+    letterSpacing: 0.5,
   },
 });

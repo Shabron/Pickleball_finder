@@ -1,10 +1,16 @@
+/**
+ * PartnerPostCard — Post card for partner search posts
+ *
+ * Follows Stitch "No-Line Rule" — uses tonal layering for action separator.
+ * XL corners, theme-aware colors, accessible touch targets.
+ */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MessageSquare, Bookmark, CornerUpLeft } from 'lucide-react-native';
 import Card from './common/Card';
 import Avatar from './common/Avatar';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import Badge from './common/Badge';
+import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme/spacing';
 
 export interface PartnerPostData {
@@ -14,6 +20,8 @@ export interface PartnerPostData {
   timeAgo: string;
   content: string;
   avatarUri?: string;
+  playStyle?: string;
+  location?: string;
 }
 
 interface PartnerPostCardProps {
@@ -21,113 +29,141 @@ interface PartnerPostCardProps {
   onReply?: () => void;
   onSave?: () => void;
   onMessage?: () => void;
+  onPress?: () => void;
 }
 
-export default function PartnerPostCard({ post, onReply, onSave, onMessage }: PartnerPostCardProps) {
+export default function PartnerPostCard({
+  post,
+  onReply,
+  onSave,
+  onMessage,
+  onPress,
+}: PartnerPostCardProps) {
+  const { colors, typography } = useTheme();
+
   return (
-    <Card style={styles.card}>
-      <View style={styles.header}>
-        <Avatar name={post.name} uri={post.avatarUri} size={40} />
-        <View style={styles.headerTextContainer}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{post.name}</Text>
-            <Text style={styles.timeText}>{post.timeAgo}</Text>
-          </View>
-          <View style={styles.levelRow}>
-            <View style={styles.dot} />
-            <Text style={styles.levelText}>Level {post.level}</Text>
+    <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
+      <Card>
+        {/* Header: Avatar + Name + Time */}
+        <View style={styles.header}>
+          <Avatar name={post.name} uri={post.avatarUri} size={46} />
+          <View style={styles.headerText}>
+            <View style={styles.nameRow}>
+              <Text style={[typography.titleSmall, { color: colors.onSurface }]}>
+                {post.name}
+              </Text>
+              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+                {post.timeAgo}
+              </Text>
+            </View>
+            <View style={styles.badgeRow}>
+              <Badge label={`Level ${post.level}`} variant="primary" size="small" />
+              {post.playStyle && (
+                <Badge
+                  label={post.playStyle}
+                  variant="secondary"
+                  size="small"
+                  style={{ marginLeft: spacing.xs }}
+                />
+              )}
+            </View>
           </View>
         </View>
-      </View>
-      
-      <Text style={styles.content}>{post.content}</Text>
-      
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={onReply}>
-          <CornerUpLeft size={18} color={colors.textSecondary} />
-          <Text style={styles.actionText}>Reply</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} onPress={onSave}>
-          <Bookmark size={18} color={colors.textSecondary} />
-          <Text style={styles.actionText}>Save</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton} onPress={onMessage}>
-          <MessageSquare size={18} color={colors.textSecondary} />
-          <Text style={styles.actionText}>Message</Text>
-        </TouchableOpacity>
-      </View>
-    </Card>
+
+        {/* Content */}
+        <Text style={[typography.bodyLarge, { color: colors.onSurface, marginBottom: spacing.lg }]}>
+          {post.content}
+        </Text>
+
+        {/* Location */}
+        {post.location && (
+          <Text
+            style={[
+              typography.labelMedium,
+              { color: colors.onSurfaceVariant, marginBottom: spacing.md },
+            ]}
+          >
+            📍 {post.location}
+          </Text>
+        )}
+
+        {/* Actions — separated by tonal shift, NOT a border */}
+        <View
+          style={[
+            styles.actions,
+            { backgroundColor: colors.surfaceContainerLow },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={onReply}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <CornerUpLeft size={18} color={colors.onSurfaceVariant} />
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
+              Reply
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={onSave}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Bookmark size={18} color={colors.onSurfaceVariant} />
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
+              Save
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={onMessage}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MessageSquare size={18} color={colors.onSurfaceVariant} />
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
+              Message
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: spacing.m,
-  },
   header: {
     flexDirection: 'row',
-    marginBottom: spacing.s,
+    marginBottom: spacing.md,
   },
-  headerTextContainer: {
+  headerText: {
     flex: 1,
-    marginLeft: spacing.m,
+    marginLeft: spacing.md,
     justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: spacing.xs,
   },
-  name: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  timeText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  levelRow: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.secondary,
-    marginRight: 4,
-  },
-  levelText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  content: {
-    ...typography.bodySmall,
-    color: colors.text,
-    lineHeight: 20,
-    marginBottom: spacing.m,
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: spacing.s,
-    borderTopWidth: 1,
-    borderTopColor: colors.background, // extremely subtle divider
+    justifyContent: 'space-around',
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    marginTop: spacing.xs,
+    marginHorizontal: -spacing.sm,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.s,
-  },
-  actionText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
-    fontWeight: '600',
+    paddingHorizontal: spacing.sm,
   },
 });

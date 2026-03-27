@@ -1,13 +1,30 @@
+/**
+ * HomeScreen — Posts & Location Filter
+ *
+ * Matches Stitch "Posts & Location Filter" design:
+ * - Filter bar with state dropdown and distance slider
+ * - Partner post cards with tonal layering
+ * - FAB for creating new posts
+ * - Responsive layout
+ */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { Plus } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PartnerPostCard, { PartnerPostData } from '../../components/PartnerPostCard';
 import Dropdown from '../../components/common/Dropdown';
 import FAB from '../../components/common/FAB';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius } from '../../theme/spacing';
+
+const LOCATION_OPTIONS = [
+  { label: 'Florida', value: 'FL' },
+  { label: 'California', value: 'CA' },
+  { label: 'Arizona', value: 'AZ' },
+  { label: 'Texas', value: 'TX' },
+  { label: 'North Carolina', value: 'NC' },
+];
 
 const MOCK_POSTS: PartnerPostData[] = [
   {
@@ -15,7 +32,9 @@ const MOCK_POSTS: PartnerPostData[] = [
     name: 'Arthur S.',
     level: '3.0',
     timeAgo: '1 day ago',
-    content: 'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts.',
+    content: 'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts. Intermediate level preferred!',
+    playStyle: 'Doubles',
+    location: 'Sarasota, FL',
   },
   {
     id: '2',
@@ -23,136 +42,150 @@ const MOCK_POSTS: PartnerPostData[] = [
     level: '3.5',
     timeAgo: '3 hours ago',
     content: 'Intermediate player seeking a regular Tuesday partner, 10 am. Open to all levels.',
+    playStyle: 'Any',
+    location: 'Tampa, FL',
+  },
+  {
+    id: '3',
+    name: 'Walter K.',
+    level: '4.0',
+    timeAgo: '5 hours ago',
+    content: 'Advanced player looking for competitive practice partners for weekend mornings.',
+    playStyle: 'Singles',
+    location: 'Miami, FL',
   },
 ];
 
-export default function HomeScreen() {
-  const [location, setLocation] = useState('florida');
-
-  const locationOptions = [
-    { label: 'Florida (FL)', value: 'florida' },
-    { label: 'California (CA)', value: 'california' },
-    { label: 'Arizona (AZ)', value: 'arizona' },
-  ];
+export default function HomeScreen({ navigation }: any) {
+  const [location, setLocation] = useState('FL');
+  const { colors, typography } = useTheme();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header />
-      
-      <View style={styles.filterSection}>
-        <View style={styles.locationContainer}>
-          <Text style={styles.filterText}>Showing posts in:</Text>
-          <View style={{ flex: 1, marginLeft: spacing.s }}>
-            <Dropdown
-              options={locationOptions}
-              value={location}
-              onSelect={setLocation}
-              placeholder="Select Location"
+    <ScreenWrapper>
+      <Header
+        showNotificationBell
+        notificationCount={3}
+        onNotificationPress={() => navigation.navigate('Notifications')}
+      />
+
+      {/* ─── Filter Section ─── */}
+      <View
+        style={[
+          styles.filterSection,
+          { backgroundColor: colors.surfaceContainerLow },
+        ]}
+      >
+        <Text
+          style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.sm }]}
+        >
+          Showing posts in:
+        </Text>
+        <Dropdown
+          options={LOCATION_OPTIONS}
+          value={location}
+          onSelect={setLocation}
+          placeholder="Select State"
+        />
+
+        {/* Distance indicator */}
+        <View style={styles.distanceRow}>
+          <View style={[styles.distanceTrack, { backgroundColor: colors.outlineVariant + '40' }]}>
+            <View
+              style={[
+                styles.distanceFill,
+                { backgroundColor: colors.primary, width: '40%' },
+              ]}
+            />
+            <View
+              style={[
+                styles.distanceThumb,
+                {
+                  left: '40%',
+                  backgroundColor: colors.surfaceContainerLowest,
+                  borderColor: colors.primary,
+                },
+              ]}
             />
           </View>
-        </View>
-        
-        {/* Simple mock slider UI */}
-        <View style={styles.sliderContainer}>
-          <View style={styles.sliderTrack}>
-            <View style={styles.sliderFill} />
-            <View style={styles.sliderThumb} />
-          </View>
-          <Text style={styles.distanceText}>Within 10 miles</Text>
+          <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.md }]}>
+            Within 10 mi
+          </Text>
         </View>
       </View>
 
+      {/* ─── Post List ─── */}
       <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>Partner Posts</Text>
+        <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
+          Partner Posts
+        </Text>
+        <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+          {MOCK_POSTS.length} active posts
+        </Text>
       </View>
 
       <FlatList
         data={MOCK_POSTS}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-          <PartnerPostCard post={item} />
+          <PartnerPostCard
+            post={item}
+            onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
+            onMessage={() => navigation.navigate('ChatThread')}
+          />
         )}
       />
 
-      <FAB icon={<Plus color="#FFF" size={24} />} onPress={() => {}} />
-    </SafeAreaView>
+      <FAB
+        icon={<Plus color={colors.surfaceContainerLowest} size={24} />}
+        onPress={() => navigation.navigate('CreatePost')}
+      />
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   filterSection: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-    backgroundColor: colors.primaryLight,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: spacing.m,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderBottomLeftRadius: borderRadius.xl,
+    borderBottomRightRadius: borderRadius.xl,
+    marginBottom: spacing.lg,
   },
-  locationContainer: {
+  distanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.s,
-    zIndex: 10,
+    marginTop: spacing.md,
   },
-  filterText: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: spacing.m, // to align with dropdown
-  },
-  sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.s,
-  },
-  sliderTrack: {
+  distanceTrack: {
     flex: 1,
     height: 4,
-    backgroundColor: colors.border,
     borderRadius: 2,
-    marginRight: spacing.m,
     position: 'relative',
     justifyContent: 'center',
   },
-  sliderFill: {
+  distanceFill: {
     position: 'absolute',
     left: 0,
-    width: '40%',
     height: 4,
-    backgroundColor: colors.primary,
     borderRadius: 2,
   },
-  sliderThumb: {
+  distanceThumb: {
     position: 'absolute',
-    left: '40%',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#FFF',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
-    borderColor: colors.primary,
-    marginLeft: -8,
-  },
-  distanceText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    marginLeft: -9,
   },
   listHeader: {
-    paddingHorizontal: spacing.m,
-    marginBottom: spacing.s,
-  },
-  listTitle: {
-    ...typography.h2,
-    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
   },
   listContainer: {
-    paddingHorizontal: spacing.s,
-    paddingBottom: 80, // For FAB
+    paddingHorizontal: spacing.md,
+    paddingBottom: 100,
   },
 });

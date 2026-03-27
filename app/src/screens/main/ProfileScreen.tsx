@@ -1,187 +1,229 @@
+/**
+ * ProfileScreen — User profile view
+ *
+ * Themed profile card, badges, menu items with tonal layering.
+ * Links to Edit Profile, About, Notifications, Settings, Logout.
+ */
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
-import { Settings, LogOut, Info, ChevronRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
+import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import Card from '../../components/common/Card';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 export default function ProfileScreen({ navigation }: any) {
+  const { colors, typography, toggleTheme, isDark } = useTheme();
+
   const handleLogout = () => {
     navigation.replace('Login');
   };
 
+  const menuItems = [
+    {
+      icon: <Edit size={sizes.iconSmall} color={colors.secondary} />,
+      label: 'Edit Profile',
+      onPress: () => navigation.navigate('EditProfile'),
+    },
+    {
+      icon: <Bell size={sizes.iconSmall} color={colors.tertiary} />,
+      label: 'Notifications',
+      onPress: () => navigation.navigate('Notifications'),
+      badge: 3,
+    },
+    {
+      icon: <Settings size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
+      label: 'Account Settings',
+      onPress: () => {},
+    },
+    {
+      icon: <Shield size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
+      label: `${isDark ? 'Light' : 'Dark'} Mode`,
+      onPress: toggleTheme,
+    },
+    {
+      icon: <Info size={sizes.iconSmall} color={colors.secondary} />,
+      label: 'About the App',
+      onPress: () => navigation.navigate('About'),
+    },
+  ];
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header />
-      
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.profileHeader}>
-          <Avatar name="Arthur Smith" size={80} />
-          <Text style={styles.name}>Arthur Smith</Text>
-          <Text style={styles.email}>arthur.s@example.com</Text>
-          <View style={styles.badgeContainer}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Level 3.0</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: colors.primaryLight }]}>
-              <Text style={[styles.badgeText, { color: colors.primary }]}>Florida</Text>
-            </View>
-          </View>
-          
-          <Button 
-            title="Edit Profile" 
-            onPress={() => {}} 
-            variant="outline" 
-            style={styles.editButton}
-          />
-        </View>
+    <ScreenWrapper>
+      <Header title="Profile" />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Settings color={colors.primary} size={20} />
-            </View>
-            <Text style={styles.menuText}>Account Settings</Text>
-            <ChevronRight color={colors.textSecondary} size={20} />
-          </TouchableOpacity>
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ─── Profile Card ─── */}
+        <Card elevation={2} padding={spacing.xxl}>
+          <View style={styles.profileHeaderContent}>
+            <Avatar name="Arthur Smith" size={sizes.avatarLarge} />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Info color={colors.primary} size={20} />
-            </View>
-            <Text style={styles.menuText}>About the App</Text>
-            <ChevronRight color={colors.textSecondary} size={20} />
-          </TouchableOpacity>
-          
-          <View style={styles.aboutCard}>
-            <Text style={styles.aboutText}>
-              Senior Pickleball Partner Finder is designed to connect players of similar skill levels locally.
+            <Text
+              style={[typography.headlineSmall, { color: colors.onSurface, marginTop: spacing.md }]}
+            >
+              Arthur Smith
             </Text>
-            <Text style={styles.versionText}>Version 1.0.0</Text>
+            <Text
+              style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}
+            >
+              arthur.s@example.com
+            </Text>
+
+            <View style={styles.badgeRow}>
+              <Badge label="Level 3.0" variant="primary" size="large" />
+              <Badge
+                label="Florida"
+                variant="secondary"
+                size="large"
+                style={{ marginLeft: spacing.sm }}
+              />
+              <Badge
+                label="Doubles"
+                variant="tertiary"
+                size="large"
+                style={{ marginLeft: spacing.sm }}
+              />
+            </View>
+
+            <Button
+              title="Edit Profile"
+              onPress={() => navigation.navigate('EditProfile')}
+              variant="outline"
+              style={{ width: '100%', marginTop: spacing.lg }}
+            />
+          </View>
+        </Card>
+
+        {/* ─── Stats ─── */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statItem, { backgroundColor: colors.surfaceContainerLow }]}>
+            <Text style={[typography.headlineMedium, { color: colors.primary }]}>12</Text>
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Matches</Text>
+          </View>
+          <View style={[styles.statItem, { backgroundColor: colors.surfaceContainerLow }]}>
+            <Text style={[typography.headlineMedium, { color: colors.secondary }]}>5</Text>
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Posts</Text>
+          </View>
+          <View style={[styles.statItem, { backgroundColor: colors.surfaceContainerLow }]}>
+            <Text style={[typography.headlineMedium, { color: colors.tertiary }]}>8</Text>
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Chats</Text>
           </View>
         </View>
 
-        <Button 
-          title="LOGOUT" 
-          onPress={handleLogout} 
-          variant="ghost" 
-          style={styles.logoutButton}
-          textStyle={{ color: colors.error }}
+        {/* ─── Menu Items ─── */}
+        <View style={styles.menuSection}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.menuItem, { backgroundColor: colors.surfaceContainerLowest }]}
+              onPress={item.onPress}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.menuIconContainer,
+                  { backgroundColor: colors.surfaceContainerHigh },
+                ]}
+              >
+                {item.icon}
+              </View>
+              <Text
+                style={[typography.bodyLarge, { color: colors.onSurface, flex: 1, fontWeight: '500' }]}
+              >
+                {item.label}
+              </Text>
+              {item.badge ? (
+                <View style={[styles.menuBadge, { backgroundColor: colors.tertiary }]}>
+                  <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 10 }]}>
+                    {item.badge}
+                  </Text>
+                </View>
+              ) : null}
+              <ChevronRight color={colors.onSurfaceVariant} size={sizes.iconSmall} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ─── Logout ─── */}
+        <Button
+          title="LOGOUT"
+          onPress={handleLogout}
+          variant="error"
+          style={{ marginTop: spacing.lg }}
+          icon={<LogOut color={colors.onError} size={18} />}
         />
+
+        {/* Version */}
+        <Text
+          style={[
+            typography.labelSmall,
+            { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.lg },
+          ]}
+        >
+          Senior Pickleball v1.0.0
+        </Text>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   container: {
-    padding: spacing.m,
+    padding: spacing.lg,
+    paddingBottom: spacing.massive,
   },
-  profileHeader: {
+  profileHeaderContent: {
     alignItems: 'center',
-    backgroundColor: '#FFF',
-    padding: spacing.xl,
-    borderRadius: 20,
-    marginBottom: spacing.l,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
   },
-  name: {
-    ...typography.h2,
-    color: colors.text,
-    marginTop: spacing.s,
-  },
-  email: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginBottom: spacing.m,
-  },
-  badgeContainer: {
+  badgeRow: {
     flexDirection: 'row',
-    marginBottom: spacing.m,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
   },
-  badge: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.xs,
-    borderRadius: 16,
-    marginHorizontal: spacing.xs,
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xxl,
   },
-  badgeText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: '#FFF',
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.xl,
   },
-  editButton: {
-    width: '100%',
-    height: 40,
-  },
-  section: {
-    marginBottom: spacing.l,
-  },
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.s,
-    marginLeft: spacing.s,
+  menuSection: {
+    gap: spacing.sm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
-    padding: spacing.m,
-    borderRadius: 12,
-    marginBottom: spacing.s,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
   },
   menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.m,
+    marginRight: spacing.md,
   },
-  menuText: {
-    flex: 1,
-    ...typography.body,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  aboutCard: {
-    backgroundColor: colors.primaryLight,
-    padding: spacing.m,
-    borderRadius: 12,
-    marginTop: spacing.s,
-  },
-  aboutText: {
-    ...typography.bodySmall,
-    color: colors.text,
-    lineHeight: 20,
-  },
-  versionText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.s,
-    textAlign: 'right',
-  },
-  logoutButton: {
-    marginTop: spacing.m,
+  menuBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    marginRight: spacing.sm,
   },
 });

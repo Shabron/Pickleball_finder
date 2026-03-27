@@ -1,6 +1,13 @@
+/**
+ * FAB — Floating Action Button
+ *
+ * Ambient shadow per Stitch spec (24px blur, 6% opacity).
+ * Primary color, large touch target (56px).
+ */
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import { sizes, spacing } from '../../theme/spacing';
 
 interface FABProps {
   icon: React.ReactNode;
@@ -9,28 +16,38 @@ interface FABProps {
 }
 
 export default function FAB({ icon, onPress, style }: FABProps) {
+  const { colors } = useTheme();
+
   return (
-    <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={[
+        styles.fab,
+        { backgroundColor: colors.primary },
+        style,
+      ]}
+    >
       {icon}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fab: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primary,
+    bottom: spacing.xxl,
+    right: spacing.xl,
+    width: sizes.touchTarget,
+    height: sizes.touchTarget,
+    borderRadius: sizes.touchTarget / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    // Ambient shadow
+    shadowColor: '#2f3d00',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
     elevation: 6,
   },
 });

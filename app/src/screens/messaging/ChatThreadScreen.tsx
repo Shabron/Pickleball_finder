@@ -1,199 +1,245 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { ChevronLeft, Send } from 'lucide-react-native';
+/**
+ * ChatThreadScreen — Real-time messaging
+ *
+ * Matches Stitch "Messaging (Final Polish)" design:
+ * - Themed message bubbles (primary for sent, surfaceContainer for received)
+ * - Tonal input bar
+ * - Glassmorphic header with back button and avatar
+ */
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { ChevronLeft, Send, Phone, MoreVertical } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Avatar from '../../components/common/Avatar';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
-const MOCK_MESSAGES = [
+interface Message {
+  id: string;
+  text: string;
+  senderId: 'me' | 'other';
+  time: string;
+}
+
+const MOCK_MESSAGES: Message[] = [
   { id: '1', text: 'Hey, saw your post. Are you still looking for a partner?', senderId: 'other', time: '10:00 AM' },
   { id: '2', text: 'Yes, definitely! Are you available this Saturday morning?', senderId: 'me', time: '10:05 AM' },
   { id: '3', text: 'Saturday works perfectly. What skill level are you looking for exactly?', senderId: 'other', time: '10:08 AM' },
-  { id: '4', text: 'I am a 3.0, but open to play with a 3.5. Let\'s meet at Riverside.', senderId: 'me', time: '10:10 AM' },
-  { id: '5', text: 'Sounds like a plan. See you there at 9 AM!', senderId: 'other', time: '10:15 AM' },
+  { id: '4', text: "I'm a 3.0, but open to play with a 3.5. Let's meet at Riverside.", senderId: 'me', time: '10:10 AM' },
+  { id: '5', text: 'Sounds like a plan. See you there at 9 AM! 🏓', senderId: 'other', time: '10:15 AM' },
 ];
 
-export default function ChatThreadScreen({ navigation }: any) {
+export default function ChatThreadScreen({ navigation, route }: any) {
+  const partnerName = route?.params?.name || 'Arthur Smith';
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [inputText, setInputText] = useState('');
+  const flatListRef = useRef<FlatList>(null);
+  const { colors, typography } = useTheme();
 
   const handleSend = () => {
     if (!inputText.trim()) return;
-    
-    const newMessage = {
+
+    const newMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: inputText.trim(),
       senderId: 'me',
       time: 'Just now',
     };
-    
-    setMessages([...messages, newMessage]);
+
+    setMessages((prev) => [...prev, newMessage]);
     setInputText('');
+
+    // Scroll to bottom
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isMe = item.senderId === 'me';
+    return (
+      <View style={[styles.messageRow, isMe && styles.messageRowRight]}>
+        <View
+          style={[
+            styles.messageBubble,
+            {
+              backgroundColor: isMe ? colors.primary : colors.surfaceContainerHigh,
+              borderBottomRightRadius: isMe ? 4 : borderRadius.xl,
+              borderBottomLeftRadius: isMe ? borderRadius.xl : 4,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              typography.bodyLarge,
+              { color: isMe ? colors.surfaceContainerLowest : colors.onSurface },
+            ]}
+          >
+            {item.text}
+          </Text>
+          <Text
+            style={[
+              typography.labelSmall,
+              {
+                color: isMe ? 'rgba(255,255,255,0.65)' : colors.onSurfaceVariant,
+                alignSelf: 'flex-end',
+                marginTop: spacing.xs,
+              },
+            ]}
+          >
+            {item.time}
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+    <ScreenWrapper backgroundColor={colors.surfaceContainerLowest}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ChevronLeft color={colors.text} size={28} />
+        {/* ─── Chat Header ─── */}
+        <View style={[styles.header, { backgroundColor: colors.surfaceContainerLow }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.backButton}
+          >
+            <ChevronLeft color={colors.onSurface} size={sizes.iconLarge} />
           </TouchableOpacity>
-          <Avatar name="Arthur Smith" size={40} />
+
+          <Avatar name={partnerName} size={42} showOnline />
+
           <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>Arthur Smith</Text>
-            <Text style={styles.headerStatus}>Online</Text>
+            <Text style={[typography.titleSmall, { color: colors.onSurface }]}>
+              {partnerName}
+            </Text>
+            <Text style={[typography.labelSmall, { color: colors.success }]}>Online</Text>
           </View>
+
+          <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Phone color={colors.onSurfaceVariant} size={sizes.iconDefault} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={{ marginLeft: spacing.md }}
+          >
+            <MoreVertical color={colors.onSurfaceVariant} size={sizes.iconDefault} />
+          </TouchableOpacity>
         </View>
 
+        {/* ─── Messages ─── */}
         <FlatList
+          ref={flatListRef}
           data={messages}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
           contentContainerStyle={styles.messageList}
-          renderItem={({ item }) => {
-            const isMe = item.senderId === 'me';
-            return (
-              <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.theirMessage]}>
-                <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
-                  {item.text}
-                </Text>
-                <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.theirMessageTime]}>
-                  {item.time}
-                </Text>
-              </View>
-            );
-          }}
+          showsVerticalScrollIndicator={false}
         />
 
-        <View style={styles.inputContainer}>
+        {/* ─── Input Bar ─── */}
+        <View style={[styles.inputContainer, { backgroundColor: colors.surfaceContainerLow }]}>
           <TextInput
-            style={styles.input}
+            style={[
+              typography.bodyLarge,
+              styles.input,
+              {
+                backgroundColor: colors.surfaceContainerHighest,
+                color: colors.onSurface,
+              },
+            ]}
             placeholder="Type a message..."
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.onSurfaceVariant}
             value={inputText}
             onChangeText={setInputText}
             multiline
+            maxLength={500}
           />
-          <TouchableOpacity 
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              {
+                backgroundColor: inputText.trim() ? colors.primary : colors.outlineVariant,
+              },
+            ]}
             onPress={handleSend}
             disabled={!inputText.trim()}
           >
-            <Send color="#FFF" size={20} style={{ marginLeft: -2 }} />
+            <Send color={colors.surfaceContainerLowest} size={20} style={{ marginLeft: -2 }} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFF',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: '#FFF',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
     padding: spacing.xs,
-    marginRight: spacing.s,
+    marginRight: spacing.sm,
   },
   headerInfo: {
-    marginLeft: spacing.s,
+    marginLeft: spacing.sm,
     flex: 1,
   },
-  headerName: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  headerStatus: {
-    ...typography.caption,
-    color: colors.success,
-    fontWeight: '600',
-  },
   messageList: {
-    padding: spacing.m,
+    padding: spacing.lg,
     flexGrow: 1,
     justifyContent: 'flex-end',
   },
-  messageBubble: {
+  messageRow: {
+    marginBottom: spacing.sm,
     maxWidth: '80%',
-    padding: spacing.m,
-    borderRadius: 20,
-    marginBottom: spacing.s,
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  theirMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.background,
-    borderBottomLeftRadius: 4,
   },
-  messageText: {
-    ...typography.body,
-  },
-  myMessageText: {
-    color: '#FFF',
-  },
-  theirMessageText: {
-    color: colors.text,
-  },
-  messageTime: {
-    ...typography.caption,
-    marginTop: 4,
+  messageRowRight: {
     alignSelf: 'flex-end',
   },
-  myMessageTime: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  theirMessageTime: {
-    color: colors.textSecondary,
+  messageBubble: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: '#FFF',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   input: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: 12,
     paddingBottom: 12,
-    minHeight: 40,
+    minHeight: 44,
     maxHeight: 120,
-    ...typography.body,
-    color: colors.text,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.m,
-    marginBottom: 2, // align with input bottom edge
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.border,
+    marginLeft: spacing.sm,
   },
 });

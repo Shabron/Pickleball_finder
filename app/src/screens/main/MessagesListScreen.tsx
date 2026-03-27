@@ -1,12 +1,20 @@
+/**
+ * MessagesListScreen — Chat conversations list
+ *
+ * Matches Stitch "Messaging" design:
+ * - Search bar for filtering conversations
+ * - Chat list with tonal separation (no dividers per "No-Line Rule")
+ * - Unread badges in tertiary orange
+ */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Search } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Input from '../../components/common/Input';
 import Avatar from '../../components/common/Avatar';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius } from '../../theme/spacing';
 
 interface ChatPreview {
   id: string;
@@ -14,105 +22,141 @@ interface ChatPreview {
   timeAgo: string;
   message: string;
   unreadCount: number;
+  avatarUri?: string;
+  isOnline?: boolean;
 }
 
 const MOCK_CHATS: ChatPreview[] = [
-  { id: '1', name: 'Arthur S.', timeAgo: '2m ago', message: 'Are we on for Tuesday? The courts are booked.', unreadCount: 2 },
-  { id: '2', name: 'Clara M.', timeAgo: '1h ago', message: 'I\'m available for mixed doubles in Florida.', unreadCount: 1 },
-  { id: '3', name: 'Walter K.', timeAgo: '1h ago', message: 'Thanks! Let\'s team up for the next one.', unreadCount: 0 },
-  { id: '4', name: 'Betty L.', timeAgo: 'Yesterday', message: 'Sounds great.', unreadCount: 0 },
+  { id: '1', name: 'Arthur Smith', timeAgo: '2m ago', message: 'Are we on for Tuesday? The courts are booked.', unreadCount: 2, isOnline: true },
+  { id: '2', name: 'Clara Martinez', timeAgo: '1h ago', message: "I'm available for mixed doubles in Florida.", unreadCount: 1, isOnline: true },
+  { id: '3', name: 'Walter Kim', timeAgo: '1h ago', message: "Thanks! Let's team up for the next one.", unreadCount: 0, isOnline: false },
+  { id: '4', name: 'Betty Lopez', timeAgo: 'Yesterday', message: 'Sounds great. See you at 9 AM!', unreadCount: 0, isOnline: false },
+  { id: '5', name: 'Robert Chen', timeAgo: '2 days ago', message: "I'm a beginner but eager to learn.", unreadCount: 0, isOnline: false },
 ];
 
 export default function MessagesListScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
+  const { colors, typography } = useTheme();
+
+  const filteredChats = MOCK_CHATS.filter((chat) =>
+    chat.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const renderChatItem = ({ item }: { item: ChatPreview }) => {
+    const hasUnread = item.unreadCount > 0;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.chatRow,
+          {
+            backgroundColor: hasUnread
+              ? colors.surfaceContainerLow
+              : colors.transparent,
+          },
+        ]}
+        onPress={() => navigation.navigate('ChatThread', { chatId: item.id, name: item.name })}
+        activeOpacity={0.7}
+      >
+        <Avatar name={item.name} uri={item.avatarUri} size={52} showOnline={item.isOnline} />
+
+        <View style={styles.chatInfo}>
+          <View style={styles.chatHeader}>
+            <Text
+              style={[
+                typography.titleSmall,
+                { color: colors.onSurface },
+              ]}
+              numberOfLines={1}
+            >
+              {item.name}
+            </Text>
+            <Text
+              style={[
+                typography.labelSmall,
+                { color: hasUnread ? colors.tertiary : colors.onSurfaceVariant },
+              ]}
+            >
+              {item.timeAgo}
+            </Text>
+          </View>
+
+          <View style={styles.chatFooter}>
+            <Text
+              style={[
+                typography.bodyMedium,
+                {
+                  color: hasUnread ? colors.onSurface : colors.onSurfaceVariant,
+                  fontWeight: hasUnread ? '600' : '400',
+                  flex: 1,
+                  marginRight: spacing.sm,
+                },
+              ]}
+              numberOfLines={2}
+            >
+              {item.message}
+            </Text>
+            {hasUnread && (
+              <View style={[styles.badge, { backgroundColor: colors.tertiary }]}>
+                <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 10 }]}>
+                  {item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Header />
-      
+    <ScreenWrapper backgroundColor={colors.surfaceContainerLowest}>
+      <Header title="Messages" />
+
       <View style={styles.container}>
-        <Text style={styles.title}>Messages</Text>
-        
         <Input
-          placeholder="Search for player or team"
-          icon={<Search color={colors.textSecondary} size={20} />}
+          placeholder="Search conversations..."
+          icon={<Search color={colors.onSurfaceVariant} size={20} />}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={styles.searchInput}
+          containerStyle={{ marginBottom: spacing.lg }}
         />
 
         <FlatList
-          data={MOCK_CHATS}
-          keyExtractor={item => item.id}
+          data={filteredChats}
+          keyExtractor={(item) => item.id}
+          renderItem={renderChatItem}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.chatRow}
-              onPress={() => navigation.navigate('ChatThread')}
-              activeOpacity={0.7}
-            >
-              <Avatar name={item.name} size={50} />
-              
-              <View style={styles.chatInfo}>
-                <View style={styles.chatHeader}>
-                  <Text style={styles.chatName}>{item.name}</Text>
-                  <Text style={item.unreadCount > 0 ? styles.timeUnread : styles.timeText}>
-                    {item.timeAgo}
-                  </Text>
-                </View>
-                
-                <View style={styles.chatFooter}>
-                  <Text 
-                    style={[styles.messageText, item.unreadCount > 0 && styles.messageUnread]} 
-                    numberOfLines={2}
-                  >
-                    {item.message}
-                  </Text>
-                  {item.unreadCount > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.unreadCount}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+          contentContainerStyle={{ paddingBottom: spacing.massive }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
+                No conversations yet.{'\n'}Match with a partner to start chatting!
+              </Text>
+            </View>
+          }
         />
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFF',
-  },
   container: {
     flex: 1,
-    paddingHorizontal: spacing.m,
-  },
-  title: {
-    ...typography.h1,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: spacing.m,
-  },
-  searchInput: {
-    marginBottom: spacing.l,
-    backgroundColor: colors.background, // lighter for search
-    borderColor: 'transparent',
+    paddingHorizontal: spacing.lg,
   },
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.xl,
   },
   chatInfo: {
     flex: 1,
-    marginLeft: spacing.m,
+    marginLeft: spacing.md,
   },
   chatHeader: {
     flexDirection: 'row',
@@ -120,47 +164,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  chatName: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  timeText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  timeUnread: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-  },
   chatFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  messageText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flex: 1,
-    marginRight: spacing.s,
-  },
-  messageUnread: {
-    color: colors.text,
-    fontWeight: '600',
-  },
   badge: {
-    backgroundColor: colors.secondary, // or primary based on design
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: borderRadius.full,
+    minWidth: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  badgeText: {
-    ...typography.caption,
-    color: '#FFF',
-    fontWeight: '700',
+  emptyState: {
+    paddingTop: spacing.giant,
+    alignItems: 'center',
   },
 });
