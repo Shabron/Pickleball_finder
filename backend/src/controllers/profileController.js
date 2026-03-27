@@ -22,7 +22,23 @@ const getMyProfile = async (req, res) => {
 // @access  Private
 const updateMyProfile = async (req, res) => {
   try {
-    const { phone, avatar, bio, skillLevel, ageRange, state, city, zipCode, availability, playStyle } = req.body;
+    const { phone, avatar, bio, skillLevel, ageRange, state, city, zipCode, availability, playStyle, latitude, longitude } =
+      req.body;
+
+    let location;
+    if (latitude !== undefined || longitude !== undefined) {
+      const latNum = Number(latitude);
+      const lngNum = Number(longitude);
+
+      if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+        return res.status(400).json({ success: false, message: 'latitude and longitude must be numbers' });
+      }
+      if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+        return res.status(400).json({ success: false, message: 'latitude/longitude are out of range' });
+      }
+
+      location = { type: 'Point', coordinates: [lngNum, latNum] };
+    }
 
     const profileFields = {
       user: req.user._id,
@@ -36,6 +52,7 @@ const updateMyProfile = async (req, res) => {
       zipCode,
       availability,
       playStyle,
+      location,
       profileComplete: true,
     };
 

@@ -410,6 +410,29 @@ curl -X PUT http://localhost:8081/api/posts/YOUR_POST_ID \
 
 ---
 
+## Matchmaking (🔒 Requires Auth Token)
+
+### `GET /api/matchmaking/nearby`
+
+Find nearby players using profile latitude/longitude saved in their profile `location`.
+
+**Query params**
+- `lat` (number, required)
+- `lng` (number, required)
+- `radiusKm` (number, optional, default `25`)
+- `skillLevel` (optional: `Beginner` | `Intermediate` | `Advanced`)
+- `playStyle` (optional: `Singles` | `Doubles` | `Both`)
+- `limit` (optional, default `50`, max `200`)
+
+```bash
+curl "http://localhost:8081/api/matchmaking/nearby?lat=27.9506&lng=-82.4572&radiusKm=20&skillLevel=Intermediate&limit=25" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** `200 OK`
+
+---
+
 ## Users
 
 ### `GET /api/users`

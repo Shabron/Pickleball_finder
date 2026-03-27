@@ -42,6 +42,16 @@ const profileSchema = new mongoose.Schema(
       type: String,
       enum: ['Singles', 'Doubles', 'Both'],
     },
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+      },
+      // GeoJSON coordinates are [longitude, latitude]
+      coordinates: {
+        type: [Number],
+      },
+    },
     profileComplete: {
       type: Boolean,
       default: false,
@@ -54,5 +64,6 @@ const profileSchema = new mongoose.Schema(
 
 // Index for fast lookups by state + skill level (for matchmaking)
 profileSchema.index({ state: 1, skillLevel: 1 });
+profileSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Profile', profileSchema);
