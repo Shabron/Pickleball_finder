@@ -10,9 +10,16 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const postRoutes = require('./routes/postRoutes');
 const matchmakingRoutes = require('./routes/matchmakingRoutes');
+const messageRoutes = require('./routes/messageRoutes');
 
 // Initialize app
 const app = express();
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const initSocket = require('./sockets/socketManager');
+initSocket(server);
 
 // Connect to MongoDB
 connectDB();
@@ -33,12 +40,13 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Error handling
 app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 8081;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
