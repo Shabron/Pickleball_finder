@@ -57,15 +57,10 @@ export default function PartnerPostCard({
               </Text>
             </View>
             <View style={styles.badgeRow}>
-              <Badge label={`Level ${post.level}`} variant="primary" size="small" />
-              {post.playStyle && (
-                <Badge
-                  label={post.playStyle}
-                  variant="secondary"
-                  size="small"
-                  style={{ marginLeft: spacing.xs }}
-                />
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.tertiary, marginRight: 4, opacity: 0.8 }} />
+                <Text style={[typography.labelMedium, { color: colors.onSurface }]}>Level {post.level}</Text>
+              </View>
             </View>
           </View>
         </View>

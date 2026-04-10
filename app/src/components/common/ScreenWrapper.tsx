@@ -5,7 +5,8 @@
  * Follows Single Responsibility: manages only the screen shell.
  */
 import React, { ReactNode } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet, ViewStyle } from 'react-native';
+import { StatusBar, StyleSheet, ViewStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface ScreenWrapperProps {

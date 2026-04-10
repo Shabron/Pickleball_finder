@@ -30,8 +30,10 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
-  { label: 'Intermediate (3.0 - 4.0)', value: 'intermediate' },
-  { label: 'Advanced (4.5+)', value: 'advanced' },
+  { label: 'Low Intermediate (3.0 - 3.5)', value: 'lowIntermediate' },
+  { label: 'High Intermediate (3.5 - 4.0)', value: 'highIntermediate' },
+  { label: 'Advanced (4.0 - 5.0)', value: 'advanced' },
+  { label: 'Professional (5.0+)', value: 'professional' }
 ];
 
 const PLAY_STYLE_OPTIONS = [

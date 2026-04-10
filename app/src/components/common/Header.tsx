@@ -5,7 +5,7 @@
  * Uses theme-aware colors with glassmorphic style.
  */
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, Image } from 'react-native';
 import { ChevronLeft, Bell } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, sizes } from '../../theme/spacing';
@@ -21,6 +21,8 @@ interface HeaderProps {
   rightAction?: React.ReactNode;
   /** Style override */
   style?: ViewStyle;
+  /** Show app logo instead of text title */
+  showLogo?: boolean;
   /** Show notification bell */
   showNotificationBell?: boolean;
   /** Notification bell press handler */
@@ -35,6 +37,7 @@ export default function Header({
   onBack,
   rightAction,
   style,
+  showLogo = false,
   showNotificationBell = false,
   onNotificationPress,
   notificationCount = 0,
@@ -45,13 +48,13 @@ export default function Header({
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.surfaceContainerLow },
+        { backgroundColor: '#FFFFFF' },
         style,
       ]}
     >
       {/* Left */}
-      <View style={styles.leftSection}>
-        {showBack ? (
+      {showBack ? (
+        <View style={styles.leftSection}>
           <TouchableOpacity
             onPress={onBack}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -59,18 +62,29 @@ export default function Header({
           >
             <ChevronLeft color={colors.onSurface} size={sizes.iconLarge} />
           </TouchableOpacity>
-        ) : (
+        </View>
+      ) : !showLogo ? (
+        <View style={styles.leftSection}>
           <View style={styles.backPlaceholder} />
-        )}
-      </View>
+        </View>
+      ) : null}
 
       {/* Center */}
-      <Text
-        style={[typography.titleLarge, { color: colors.primary }]}
-        numberOfLines={1}
-      >
-        {title}
-      </Text>
+      <View style={styles.centerSection}>
+        {showLogo && (
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        )}
+        <Text
+          style={[typography.titleLarge, { color: '#0F2C4C', marginLeft: showLogo ? 6 : 0 }]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+      </View>
 
       {/* Right */}
       <View style={styles.rightSection}>
@@ -108,11 +122,22 @@ const styles = StyleSheet.create({
     width: 40,
     alignItems: 'flex-start',
   },
+  centerSection: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
   rightSection: {
     width: 40,
     alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'flex-end',
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    transform: [{ scale: 1.6 }],
   },
   backButton: {
     padding: spacing.xs,

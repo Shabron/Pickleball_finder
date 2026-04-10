@@ -8,22 +8,44 @@
  * - Responsive layout
  */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PartnerPostCard, { PartnerPostData } from '../../components/PartnerPostCard';
 import Dropdown from '../../components/common/Dropdown';
 import FAB from '../../components/common/FAB';
+import Slider from '../../components/common/Slider';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 
-const LOCATION_OPTIONS = [
-  { label: 'Florida', value: 'FL' },
-  { label: 'California', value: 'CA' },
-  { label: 'Arizona', value: 'AZ' },
-  { label: 'Texas', value: 'TX' },
-  { label: 'North Carolina', value: 'NC' },
+const US_STATES = [
+  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
+  { label: 'Arizona', value: 'AZ' }, { label: 'Arkansas', value: 'AR' },
+  { label: 'California', value: 'CA' }, { label: 'Colorado', value: 'CO' },
+  { label: 'Connecticut', value: 'CT' }, { label: 'Delaware', value: 'DE' },
+  { label: 'Florida', value: 'FL' }, { label: 'Georgia', value: 'GA' },
+  { label: 'Hawaii', value: 'HI' }, { label: 'Idaho', value: 'ID' },
+  { label: 'Illinois', value: 'IL' }, { label: 'Indiana', value: 'IN' },
+  { label: 'Iowa', value: 'IA' }, { label: 'Kansas', value: 'KS' },
+  { label: 'Kentucky', value: 'KY' }, { label: 'Louisiana', value: 'LA' },
+  { label: 'Maine', value: 'ME' }, { label: 'Maryland', value: 'MD' },
+  { label: 'Massachusetts', value: 'MA' }, { label: 'Michigan', value: 'MI' },
+  { label: 'Minnesota', value: 'MN' }, { label: 'Mississippi', value: 'MS' },
+  { label: 'Missouri', value: 'MO' }, { label: 'Montana', value: 'MT' },
+  { label: 'Nebraska', value: 'NE' }, { label: 'Nevada', value: 'NV' },
+  { label: 'New Hampshire', value: 'NH' }, { label: 'New Jersey', value: 'NJ' },
+  { label: 'New Mexico', value: 'NM' }, { label: 'New York', value: 'NY' },
+  { label: 'North Carolina', value: 'NC' }, { label: 'North Dakota', value: 'ND' },
+  { label: 'Ohio', value: 'OH' }, { label: 'Oklahoma', value: 'OK' },
+  { label: 'Oregon', value: 'OR' }, { label: 'Pennsylvania', value: 'PA' },
+  { label: 'Rhode Island', value: 'RI' }, { label: 'South Carolina', value: 'SC' },
+  { label: 'South Dakota', value: 'SD' }, { label: 'Tennessee', value: 'TN' },
+  { label: 'Texas', value: 'TX' }, { label: 'Utah', value: 'UT' },
+  { label: 'Vermont', value: 'VT' }, { label: 'Virginia', value: 'VA' },
+  { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
+  { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
+  { label: 'District of Columbia', value: 'DC' },
 ];
 
 const MOCK_POSTS: PartnerPostData[] = [
@@ -58,21 +80,26 @@ const MOCK_POSTS: PartnerPostData[] = [
 
 export default function HomeScreen({ navigation }: any) {
   const [location, setLocation] = useState('FL');
+  const [distance, setDistance] = useState(10);
   const { colors, typography } = useTheme();
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper backgroundColor="#EAF4FC">
       <Header
+        showLogo
         showNotificationBell
         notificationCount={3}
         onNotificationPress={() => navigation.navigate('Notifications')}
+        style={{ backgroundColor: 'transparent' }}
       />
+      
+
 
       {/* ─── Filter Section ─── */}
       <View
         style={[
           styles.filterSection,
-          { backgroundColor: colors.surfaceContainerLow },
+          { backgroundColor: '#FFFFFF' },
         ]}
       >
         <Text
@@ -81,36 +108,20 @@ export default function HomeScreen({ navigation }: any) {
           Showing posts in:
         </Text>
         <Dropdown
-          options={LOCATION_OPTIONS}
+          options={US_STATES}
           value={location}
           onSelect={setLocation}
           placeholder="Select State"
         />
 
         {/* Distance indicator */}
-        <View style={styles.distanceRow}>
-          <View style={[styles.distanceTrack, { backgroundColor: colors.outlineVariant + '40' }]}>
-            <View
-              style={[
-                styles.distanceFill,
-                { backgroundColor: colors.primary, width: '40%' },
-              ]}
-            />
-            <View
-              style={[
-                styles.distanceThumb,
-                {
-                  left: '40%',
-                  backgroundColor: colors.surfaceContainerLowest,
-                  borderColor: colors.primary,
-                },
-              ]}
-            />
-          </View>
-          <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.md }]}>
-            Within 10 mi
-          </Text>
-        </View>
+        <Slider
+          min={1}
+          max={50}
+          value={distance}
+          onValueChange={setDistance}
+          label={`Within ${distance} mi`}
+        />
       </View>
 
       {/* ─── Post List ─── */}
@@ -138,7 +149,7 @@ export default function HomeScreen({ navigation }: any) {
       />
 
       <FAB
-        icon={<Plus color={colors.surfaceContainerLowest} size={24} />}
+        icon={<Text style={{ fontSize: 24 }}>🏓</Text>}
         onPress={() => navigation.navigate('CreatePost')}
       />
     </ScreenWrapper>
@@ -146,6 +157,15 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  heroLogoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+  },
+  heroLogo: {
+    width: 280,
+    height: 160,
+  },
   filterSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -153,32 +173,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,
     marginBottom: spacing.lg,
-  },
-  distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  distanceTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  distanceFill: {
-    position: 'absolute',
-    left: 0,
-    height: 4,
-    borderRadius: 2,
-  },
-  distanceThumb: {
-    position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    marginLeft: -9,
   },
   listHeader: {
     paddingHorizontal: spacing.lg,

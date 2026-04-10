@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Mail, Lock, User, Phone, ArrowRight } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -28,8 +29,10 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
-  { label: 'Intermediate (3.0 - 4.0)', value: 'intermediate' },
-  { label: 'Advanced (4.5+)', value: 'advanced' },
+  { label: 'Low Intermediate (3.0 - 3.5)', value: 'lowIntermediate' },
+  { label: 'High Intermediate (3.5 - 4.0)', value: 'highIntermediate' },
+  { label: 'Advanced (4.0 - 5.0)', value: 'advanced' },
+  { label: 'Professional (5.0+)', value: 'professional' }
 ];
 
 const PLAY_TYPE_OPTIONS = [
@@ -103,7 +106,7 @@ export default function SignupScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor={colors.surface}>
+    <ScreenWrapper backgroundColor="#EAF4FC">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -113,36 +116,39 @@ export default function SignupScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ─── Hero Header ─── */}
-          <View
-            style={[
-              styles.heroSection,
-              { backgroundColor: colors.primaryContainer },
-            ]}
-          >
-            <Text style={[typography.headlineLarge, { color: colors.primary }]}>
-              Join the Court
+          {/* ─── Header Logo ─── */}
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* ─── Welcome Header ─── */}
+          <View style={styles.welcomeSection}>
+            <Text style={[typography.headlineMedium, styles.title]}>
+              Welcome to the Court
             </Text>
-            <Text
-              style={[
-                typography.bodyLarge,
-                { color: colors.onPrimaryContainer, marginTop: spacing.xs, textAlign: 'center' },
-              ]}
-            >
-              Create your account and find your perfect pickleball partner
+            <Text style={[typography.bodyLarge, styles.subtitle]}>
+              Connect with friends and stay active.
             </Text>
           </View>
 
-          {/* ─── Account Info ─── */}
-          <View style={styles.formSection}>
-            <Text
-              style={[
-                typography.titleLarge,
-                { color: colors.onSurface, marginBottom: spacing.xl },
-              ]}
-            >
-              Account Information
-            </Text>
+          {/* ─── Card Form Section ─── */}
+          <View style={styles.card}>
+            {/* Tabs */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={styles.tabButton}
+                onPress={() => navigation.navigate('Login')}
+              >
+                <Text style={styles.tabText}>LOG IN</Text>
+              </TouchableOpacity>
+              <View style={[styles.tabButton, styles.activeTabWhite]}>
+                <Text style={[styles.tabText, styles.activeTabTextDark]}>SIGN UP</Text>
+              </View>
+            </View>
 
             <Input
               label="Full Name"
@@ -155,8 +161,7 @@ export default function SignupScreen({ navigation }: any) {
 
             <Input
               label="Email Address"
-              placeholder="Enter your email"
-              icon={<Mail color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              placeholder="Email Address"
               value={formData.email}
               onChangeText={(t) => updateField('email', t)}
               keyboardType="email-address"
@@ -164,19 +169,8 @@ export default function SignupScreen({ navigation }: any) {
             />
 
             <Input
-              label="Phone (Optional)"
-              placeholder="Enter your phone number"
-              icon={<Phone color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
-              value={formData.phone}
-              onChangeText={(t) => updateField('phone', t)}
-              keyboardType="phone-pad"
-              containerStyle={{ marginBottom: spacing.lg }}
-            />
-
-            <Input
-              label="Password"
-              placeholder="Create a password"
-              icon={<Lock color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              label="Create Password"
+              placeholder="Create Password"
               value={formData.password}
               onChangeText={(t) => updateField('password', t)}
               isPassword
@@ -185,8 +179,7 @@ export default function SignupScreen({ navigation }: any) {
 
             <Input
               label="Confirm Password"
-              placeholder="Re-enter your password"
-              icon={<Lock color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChangeText={(t) => updateField('confirmPassword', t)}
               isPassword
@@ -195,7 +188,7 @@ export default function SignupScreen({ navigation }: any) {
                   ? 'Passwords do not match'
                   : undefined
               }
-              containerStyle={{ marginBottom: spacing.xxl }}
+              containerStyle={{ marginBottom: spacing.xl }}
             />
 
             {/* ─── Profile Details (Optional) ─── */}
@@ -216,7 +209,6 @@ export default function SignupScreen({ navigation }: any) {
               Optional — you can complete this later
             </Text>
 
-            <Card elevation={1} padding={spacing.xl}>
               <Dropdown
                 label="Skill Level"
                 placeholder="Select your level"
@@ -249,30 +241,23 @@ export default function SignupScreen({ navigation }: any) {
                 placeholder="Enter your city"
                 value={formData.city}
                 onChangeText={(t) => updateField('city', t)}
+                containerStyle={{ marginBottom: spacing.xl }}
               />
-            </Card>
 
             {/* ─── Submit ─── */}
             <Button
-              title="CREATE ACCOUNT"
+              title="JOIN THE COMMUNITY"
               onPress={handleSignup}
               loading={loading}
               disabled={!isValid}
-              icon={<ArrowRight color={colors.surfaceContainerLowest} size={20} />}
-              style={{ marginTop: spacing.lg }}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
             />
 
             {/* ─── Footer ─── */}
-            <View style={styles.footer}>
-              <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>
-                Already have an account?{' '}
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text style={[typography.titleSmall, { color: colors.secondary }]}>
-                  Log In
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.footerLink}>
+              <Text style={styles.supportText}>Contact Senior Support</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -284,23 +269,80 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  heroSection: {
+  header: {
     alignItems: 'center',
-    paddingTop: spacing.massive,
-    paddingBottom: spacing.xxxl,
-    paddingHorizontal: spacing.xxl,
-    borderBottomLeftRadius: borderRadius.xxl,
-    borderBottomRightRadius: borderRadius.xxl,
+    marginTop: spacing.md,
+    marginBottom: -35,
+    zIndex: 10,
   },
-  formSection: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xxxl,
-    paddingBottom: spacing.massive,
+  logo: {
+    width: 380,
+    height: 210,
   },
-  footer: {
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  title: {
+    color: '#0F2C4C',
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    color: '#1B1B1B',
+    marginTop: spacing.xs,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  tabContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.xxl,
-    paddingBottom: spacing.xl,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: spacing.xxl,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activeTabWhite: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  tabText: {
+    fontWeight: 'bold',
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  activeTabTextDark: {
+    color: '#111827',
+  },
+  actionButton: {
+    height: 52,
+    marginTop: spacing.xl,
+  },
+  footerLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  supportText: {
+    textDecorationLine: 'underline',
+    color: '#111827',
+    fontSize: 15,
   },
 });

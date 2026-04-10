@@ -45,7 +45,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor={colors.surface}>
+    <ScreenWrapper backgroundColor="#EAF4FC">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -55,48 +55,43 @@ export default function LoginScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ─── Hero Section ─── */}
-          <View
-            style={[
-              styles.heroSection,
-              { backgroundColor: colors.primaryContainer },
-            ]}
-          >
-            {/* Logo circle */}
-            <View
-              style={[
-                styles.logoCircle,
-                { backgroundColor: colors.surfaceContainerLowest },
-              ]}
-            >
-              <Text style={[typography.headlineLarge, { color: colors.primary }]}>
-                🏓
-              </Text>
-            </View>
+          {/* ─── Header Logo ─── */}
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-            <Text style={[typography.headlineLarge, { color: colors.primary, marginTop: spacing.lg }]}>
-              Senior Pickleball
+          {/* ─── Welcome Header ─── */}
+          <View style={styles.welcomeSection}>
+            <Text style={[typography.headlineMedium, styles.title]}>
+              Welcome to the Court
             </Text>
-            <Text style={[typography.titleSmall, { color: colors.onPrimaryContainer, marginTop: spacing.xs }]}>
-              Find Your Perfect Partner
+            <Text style={[typography.bodyLarge, styles.subtitle]}>
+              Connect with friends and stay active.
             </Text>
           </View>
 
-          {/* ─── Form Section ─── */}
-          <View style={styles.formSection}>
-            <Text
-              style={[
-                typography.headlineSmall,
-                { color: colors.onSurface, marginBottom: spacing.xxl },
-              ]}
-            >
-              Welcome Back
-            </Text>
+          {/* ─── Card Form Section ─── */}
+          <View style={styles.card}>
+            {/* Tabs */}
+            <View style={styles.tabContainer}>
+              <View style={[styles.tabButton, styles.activeTabWhite]}>
+                <Text style={[styles.tabText, styles.activeTabTextDark]}>LOG IN</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.tabButton}
+                onPress={() => navigation.navigate('Signup')}
+              >
+                <Text style={styles.tabText}>SIGN UP</Text>
+              </TouchableOpacity>
+            </View>
 
             <Input
-              label="Email"
-              placeholder="Enter your email address"
-              icon={<Mail color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              label="Email Address"
+              placeholder="Email Address"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -105,60 +100,33 @@ export default function LoginScreen({ navigation }: any) {
 
             <Input
               label="Password"
-              placeholder="Enter your password"
-              icon={<Lock color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              placeholder="Password"
               value={password}
               onChangeText={setPassword}
               isPassword
               containerStyle={{ marginBottom: spacing.sm }}
             />
 
-            <TouchableOpacity
-              style={styles.forgotPassword}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            <TouchableOpacity 
+              style={styles.forgotPasswordContainer}
+              onPress={() => { /* Navigate to forgot password */ }}
             >
-              <Text style={[typography.labelLarge, { color: colors.secondary }]}>
-                Forgot Password?
-              </Text>
+              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
 
             <Button
-              title="LOGIN"
+              title="ENTER THE COURT"
               onPress={handleLogin}
               loading={loading}
               disabled={!email.trim() || !password.trim()}
-              icon={<ArrowRight color={colors.surfaceContainerLowest} size={20} />}
-              style={{ marginTop: spacing.xxl }}
-            />
-
-            {/* ─── Divider ─── */}
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.outlineVariant }]} />
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginHorizontal: spacing.md }]}>
-                OR
-              </Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.outlineVariant }]} />
-            </View>
-
-            {/* ─── Social Login (Visual Only) ─── */}
-            <Button
-              title="Continue with Google"
-              onPress={() => {}}
-              variant="outline"
-              style={{ marginBottom: spacing.md }}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
             />
 
             {/* ─── Footer ─── */}
-            <View style={styles.footer}>
-              <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>
-                Don't have an account?{' '}
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                <Text style={[typography.titleSmall, { color: colors.secondary }]}>
-                  Sign Up
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.footerLink}>
+              <Text style={styles.supportText}>Contact Senior Support</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -170,46 +138,91 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  heroSection: {
+  header: {
     alignItems: 'center',
-    paddingTop: spacing.giant,
-    paddingBottom: spacing.xxxl,
-    borderBottomLeftRadius: borderRadius.xxl,
-    borderBottomRightRadius: borderRadius.xxl,
+    marginTop: spacing.md,
+    marginBottom: -35,
+    zIndex: 10,
   },
-  logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
+  logo: {
+    width: 380,
+    height: 210,
+  },
+  welcomeSection: {
     alignItems: 'center',
-    shadowColor: '#2f3d00',
+    marginBottom: spacing.xl,
+  },
+  title: {
+    color: '#0F2C4C',
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    color: '#1B1B1B',
+    marginTop: spacing.xs,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
+    elevation: 4,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowRadius: 12,
   },
-  formSection: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xxxl,
-    paddingBottom: spacing.massive,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    paddingVertical: spacing.xs,
-  },
-  dividerRow: {
+  tabContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.xxl,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: spacing.xxl,
   },
-  dividerLine: {
+  tabButton: {
     flex: 1,
-    height: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: 6,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
+  activeTabWhite: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  tabText: {
+    fontWeight: 'bold',
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  activeTabTextDark: {
+    color: '#111827',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.xl,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  forgotPasswordText: {
+    color: '#3876AB',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  actionButton: {
+    height: 52,
+    marginTop: spacing.xs,
+  },
+  footerLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  supportText: {
+    textDecorationLine: 'underline',
+    color: '#111827',
+    fontSize: 15,
   },
 });

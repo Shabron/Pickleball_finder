@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   },
   shadow: {
     // Ambient shadow per Stitch: 24px blur, 6% opacity, tinted with onSurface
-    shadowColor: '#2f3d00',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 24,

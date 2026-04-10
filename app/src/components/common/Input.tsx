@@ -50,9 +50,9 @@ export default function Input({
         style={[
           styles.inputRow,
           {
-            backgroundColor: colors.surfaceContainerHighest,
-            borderColor: error ? colors.error : colors.transparent,
-            borderWidth: error ? 1.5 : 0,
+            backgroundColor: '#FFFFFF',
+            borderColor: error ? colors.error : '#D1D5DB',
+            borderWidth: 1,
           },
         ]}
       >

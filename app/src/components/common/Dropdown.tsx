@@ -67,7 +67,11 @@ export default function Dropdown({
         onPress={() => setIsOpen(true)}
         style={[
           styles.trigger,
-          { backgroundColor: colors.surfaceContainerHighest },
+          { 
+            backgroundColor: '#FFFFFF',
+            borderColor: '#D1D5DB',
+            borderWidth: 1,
+          },
         ]}
       >
         <Text
@@ -98,7 +102,7 @@ export default function Dropdown({
           <View
             style={[
               styles.dropdownList,
-              { backgroundColor: colors.surfaceContainerLowest },
+              { backgroundColor: '#FFFFFF' },
             ]}
           >
             {label && (

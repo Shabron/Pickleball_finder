@@ -6,7 +6,7 @@
  * Fully round shape per "Sunlit Court" design system.
  */
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { borderRadius, sizes } from '../../theme/spacing';
 
@@ -18,8 +18,8 @@ interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   /** Optional icon to render before the title */
   icon?: React.ReactNode;
 }

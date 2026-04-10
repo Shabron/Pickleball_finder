@@ -1,71 +1,70 @@
 /**
- * Pickleball Finder — "Sunlit Court" Design System Colors
+ * Pickleball Finder — "Ocean Wave" Design System Colors
  *
- * Based on the Stitch design system with Material 3 color tokens.
- * All screens consume these via ThemeContext for easy theme switching.
+ * Updated neutral/blue theme based on the new design screenshot.
  */
 
-// ─── Light Theme (Default — "Sunlit Court") ──────────────────────────
+// ─── Light Theme ──────────────────────────────────────────────────────
 export const lightColors = {
-  // Primary — Pickleball Green
-  primary: '#324100',
-  primaryContainer: '#ccf05f',
-  primaryDim: '#283500',
-  onPrimary: '#aacc3f',
-  onPrimaryContainer: '#455900',
+  // Primary — Deep Blue (used for FAB, active states)
+  primary: '#1D628B',
+  primaryContainer: '#DDF0FF',
+  primaryDim: '#154A6B',
+  onPrimary: '#FFFFFF',
+  onPrimaryContainer: '#08253A',
 
-  // Secondary — Cool Blue
-  secondary: '#006c90',
-  secondaryContainer: '#c2e8ff',
-  secondaryDim: '#005f80',
-  onSecondary: '#ffffff',
-  onSecondaryContainer: '#005876',
+  // Secondary — Calm Light Blue
+  secondary: '#3182CE',
+  secondaryContainer: '#EBF8FF',
+  secondaryDim: '#2B6CB0',
+  onSecondary: '#FFFFFF',
+  onSecondaryContainer: '#1A365D',
 
-  // Tertiary — Warm Orange (highlights, notifications)
-  tertiary: '#905800',
-  tertiaryContainer: '#faa73c',
-  tertiaryDim: '#7f4d00',
-  onTertiary: '#ffffff',
-  onTertiaryContainer: '#512f00',
+  // Tertiary — Orange (for badges, accents)
+  tertiary: '#DD6B20',
+  tertiaryContainer: '#FEEBC8',
+  tertiaryDim: '#C05621',
+  onTertiary: '#FFFFFF',
+  onTertiaryContainer: '#4A2311',
 
   // Error
-  error: '#b23d21',
-  errorContainer: '#fa7150',
-  onError: '#ffffff',
-  onErrorContainer: '#671200',
+  error: '#C53030',
+  errorContainer: '#FED7D7',
+  onError: '#FFFFFF',
+  onErrorContainer: '#4A0D0D',
 
-  // Surfaces — Tonal Layering (no explicit borders!)
-  surface: '#fbffe2',
-  surfaceBright: '#fbffe2',
-  surfaceDim: '#d2ee7f',
-  surfaceContainer: '#ebfbba',
-  surfaceContainerHigh: '#e3f6a7',
-  surfaceContainerHighest: '#dbf294',
-  surfaceContainerLow: '#f4ffcb',
-  surfaceContainerLowest: '#ffffff',
-  surfaceTint: '#324100',
-  surfaceVariant: '#dbf294',
+  // Surfaces — Clean Neutral
+  surface: '#FFFFFF',
+  surfaceBright: '#FFFFFF',
+  surfaceDim: '#F7FAFC',
+  surfaceContainer: '#EDF2F7',
+  surfaceContainerHigh: '#E2E8F0',
+  surfaceContainerHighest: '#CBD5E0',
+  surfaceContainerLow: '#FFFFFF',
+  surfaceContainerLowest: '#FFFFFF',
+  surfaceTint: '#1D628B',
+  surfaceVariant: '#E2E8F0',
 
   // On-Surface Text
-  onSurface: '#2f3d00',
-  onSurfaceVariant: '#596b1d',
-  inverseSurface: '#0b1000',
-  inverseOnSurface: '#99a17e',
-  inversePrimary: '#d7fc69',
+  onSurface: '#1A202C',
+  onSurfaceVariant: '#4A5568',
+  inverseSurface: '#1A202C',
+  inverseOnSurface: '#EDF2F7',
+  inversePrimary: '#63B3ED',
 
-  // Outlines (use sparingly — prefer tonal layering)
-  outline: '#748837',
-  outlineVariant: '#acc26a',
+  // Outlines
+  outline: '#CBD5E0',
+  outlineVariant: '#E2E8F0',
 
   // Semantic
-  success: '#10B981',
-  warning: '#F59E0B',
+  success: '#38A169',
+  warning: '#D69E2E',
 
   // Utility
-  white: '#ffffff',
+  white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
-  scrim: 'rgba(11, 16, 0, 0.32)',
+  scrim: 'rgba(0, 0, 0, 0.32)',
 } as const;
 
 /** Color theme type */
@@ -75,53 +74,53 @@ export type ThemeColors = {
 
 // ─── Dark Theme ──────────────────────────────────────────────────────
 export const darkColors: ThemeColors = {
-  primary: '#ccf05f',
-  primaryContainer: '#455900',
-  primaryDim: '#bfe252',
-  onPrimary: '#1a2400',
-  onPrimaryContainer: '#ccf05f',
+  primary: '#63B3ED',
+  primaryContainer: '#08253A',
+  primaryDim: '#4299E1',
+  onPrimary: '#1A365D',
+  onPrimaryContainer: '#DDF0FF',
 
-  secondary: '#9fddff',
-  secondaryContainer: '#004d66',
-  secondaryDim: '#80d0f5',
-  onSecondary: '#003546',
-  onSecondaryContainer: '#c2e8ff',
+  secondary: '#90CDF4',
+  secondaryContainer: '#1A365D',
+  secondaryDim: '#63B3ED',
+  onSecondary: '#1A365D',
+  onSecondaryContainer: '#EBF8FF',
 
-  tertiary: '#faa73c',
-  tertiaryContainer: '#5d3700',
-  tertiaryDim: '#ea9a2f',
-  onTertiary: '#291600',
-  onTertiaryContainer: '#faa73c',
+  tertiary: '#F6AD55',
+  tertiaryContainer: '#4A2311',
+  tertiaryDim: '#DD6B20',
+  onTertiary: '#4A2311',
+  onTertiaryContainer: '#FEEBC8',
 
-  error: '#fa7150',
-  errorContainer: '#821a01',
-  onError: '#3e0600',
-  onErrorContainer: '#fa7150',
+  error: '#FC8181',
+  errorContainer: '#4A0D0D',
+  onError: '#4A0D0D',
+  onErrorContainer: '#FED7D7',
 
-  surface: '#131800',
-  surfaceBright: '#2a3200',
-  surfaceDim: '#0b1000',
-  surfaceContainer: '#1a2100',
-  surfaceContainerHigh: '#222b00',
-  surfaceContainerHighest: '#2a3400',
-  surfaceContainerLow: '#161d00',
-  surfaceContainerLowest: '#0b1000',
-  surfaceTint: '#ccf05f',
-  surfaceVariant: '#3a4500',
+  surface: '#1A202C',
+  surfaceBright: '#2D3748',
+  surfaceDim: '#171923',
+  surfaceContainer: '#2D3748',
+  surfaceContainerHigh: '#4A5568',
+  surfaceContainerHighest: '#718096',
+  surfaceContainerLow: '#1A202C',
+  surfaceContainerLowest: '#171923',
+  surfaceTint: '#63B3ED',
+  surfaceVariant: '#4A5568',
 
-  onSurface: '#dbf294',
-  onSurfaceVariant: '#acc26a',
-  inverseSurface: '#dbf294',
-  inverseOnSurface: '#2f3d00',
-  inversePrimary: '#324100',
+  onSurface: '#F7FAFC',
+  onSurfaceVariant: '#CBD5E0',
+  inverseSurface: '#F7FAFC',
+  inverseOnSurface: '#1A202C',
+  inversePrimary: '#1D628B',
 
-  outline: '#8a9f4e',
-  outlineVariant: '#596b1d',
+  outline: '#4A5568',
+  outlineVariant: '#2D3748',
 
-  success: '#34D399',
-  warning: '#FBBF24',
+  success: '#68D391',
+  warning: '#F6E05E',
 
-  white: '#ffffff',
+  white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
   scrim: 'rgba(0, 0, 0, 0.52)',
