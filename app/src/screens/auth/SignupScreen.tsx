@@ -1,0 +1,348 @@
+/**
+ * SignupScreen — Account creation with optional profile details
+ *
+ * Matches Stitch "Login / Signup" design:
+ * - Step-indicator-style form with clear sections
+ * - All inputs use themed components
+ * - State dropdown for location
+ * - Responsive for all device sizes
+ */
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+} from 'react-native';
+import { Mail, Lock, User, Phone, ArrowRight } from 'lucide-react-native';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
+import Input from '../../components/common/Input';
+import Button from '../../components/common/Button';
+import Dropdown from '../../components/common/Dropdown';
+import Card from '../../components/common/Card';
+import { useTheme } from '../../theme/ThemeContext';
+import { spacing, borderRadius, sizes } from '../../theme/spacing';
+
+const SKILL_OPTIONS = [
+  { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
+  { label: 'Low Intermediate (3.0 - 3.5)', value: 'lowIntermediate' },
+  { label: 'High Intermediate (3.5 - 4.0)', value: 'highIntermediate' },
+  { label: 'Advanced (4.0 - 5.0)', value: 'advanced' },
+  { label: 'Professional (5.0+)', value: 'professional' }
+];
+
+const PLAY_TYPE_OPTIONS = [
+  { label: 'Singles', value: 'singles' },
+  { label: 'Doubles', value: 'doubles' },
+  { label: 'Mixed Doubles', value: 'mixed' },
+  { label: 'Any / All Types', value: 'any' },
+];
+
+const US_STATES = [
+  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
+  { label: 'Arizona', value: 'AZ' }, { label: 'Arkansas', value: 'AR' },
+  { label: 'California', value: 'CA' }, { label: 'Colorado', value: 'CO' },
+  { label: 'Connecticut', value: 'CT' }, { label: 'Delaware', value: 'DE' },
+  { label: 'Florida', value: 'FL' }, { label: 'Georgia', value: 'GA' },
+  { label: 'Hawaii', value: 'HI' }, { label: 'Idaho', value: 'ID' },
+  { label: 'Illinois', value: 'IL' }, { label: 'Indiana', value: 'IN' },
+  { label: 'Iowa', value: 'IA' }, { label: 'Kansas', value: 'KS' },
+  { label: 'Kentucky', value: 'KY' }, { label: 'Louisiana', value: 'LA' },
+  { label: 'Maine', value: 'ME' }, { label: 'Maryland', value: 'MD' },
+  { label: 'Massachusetts', value: 'MA' }, { label: 'Michigan', value: 'MI' },
+  { label: 'Minnesota', value: 'MN' }, { label: 'Mississippi', value: 'MS' },
+  { label: 'Missouri', value: 'MO' }, { label: 'Montana', value: 'MT' },
+  { label: 'Nebraska', value: 'NE' }, { label: 'Nevada', value: 'NV' },
+  { label: 'New Hampshire', value: 'NH' }, { label: 'New Jersey', value: 'NJ' },
+  { label: 'New Mexico', value: 'NM' }, { label: 'New York', value: 'NY' },
+  { label: 'North Carolina', value: 'NC' }, { label: 'North Dakota', value: 'ND' },
+  { label: 'Ohio', value: 'OH' }, { label: 'Oklahoma', value: 'OK' },
+  { label: 'Oregon', value: 'OR' }, { label: 'Pennsylvania', value: 'PA' },
+  { label: 'Rhode Island', value: 'RI' }, { label: 'South Carolina', value: 'SC' },
+  { label: 'South Dakota', value: 'SD' }, { label: 'Tennessee', value: 'TN' },
+  { label: 'Texas', value: 'TX' }, { label: 'Utah', value: 'UT' },
+  { label: 'Vermont', value: 'VT' }, { label: 'Virginia', value: 'VA' },
+  { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
+  { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
+  { label: 'District of Columbia', value: 'DC' },
+];
+
+export default function SignupScreen({ navigation }: any) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    skillLevel: '',
+    playType: '',
+    state: '',
+    city: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const { colors, typography } = useTheme();
+
+  const updateField = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const isValid =
+    formData.name.trim() &&
+    formData.email.trim() &&
+    formData.password.trim() &&
+    formData.password === formData.confirmPassword;
+
+  const handleSignup = () => {
+    if (!isValid) return;
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      navigation.replace('CreateProfile');
+    }, 800);
+  };
+
+  return (
+    <ScreenWrapper backgroundColor="#EAF4FC">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ─── Header Logo ─── */}
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* ─── Welcome Header ─── */}
+          <View style={styles.welcomeSection}>
+            <Text style={[typography.headlineMedium, styles.title]}>
+              Welcome to the Court
+            </Text>
+            <Text style={[typography.bodyLarge, styles.subtitle]}>
+              Connect with friends and stay active.
+            </Text>
+          </View>
+
+          {/* ─── Card Form Section ─── */}
+          <View style={styles.card}>
+            {/* Tabs */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={styles.tabButton}
+                onPress={() => navigation.navigate('Login')}
+              >
+                <Text style={styles.tabText}>LOG IN</Text>
+              </TouchableOpacity>
+              <View style={[styles.tabButton, styles.activeTabWhite]}>
+                <Text style={[styles.tabText, styles.activeTabTextDark]}>SIGN UP</Text>
+              </View>
+            </View>
+
+            <Input
+              label="Full Name"
+              placeholder="Enter your full name"
+              icon={<User color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
+              value={formData.name}
+              onChangeText={(t) => updateField('name', t)}
+              containerStyle={{ marginBottom: spacing.lg }}
+            />
+
+            <Input
+              label="Email Address"
+              placeholder="Email Address"
+              value={formData.email}
+              onChangeText={(t) => updateField('email', t)}
+              keyboardType="email-address"
+              containerStyle={{ marginBottom: spacing.lg }}
+            />
+
+            <Input
+              label="Create Password"
+              placeholder="Create Password"
+              value={formData.password}
+              onChangeText={(t) => updateField('password', t)}
+              isPassword
+              containerStyle={{ marginBottom: spacing.lg }}
+            />
+
+            <Input
+              label="Confirm Password"
+              placeholder="Confirm Password"
+              value={formData.confirmPassword}
+              onChangeText={(t) => updateField('confirmPassword', t)}
+              isPassword
+              error={
+                formData.confirmPassword && formData.password !== formData.confirmPassword
+                  ? 'Passwords do not match'
+                  : undefined
+              }
+              containerStyle={{ marginBottom: spacing.xl }}
+            />
+
+            {/* ─── Profile Details (Optional) ─── */}
+            <Text
+              style={[
+                typography.titleLarge,
+                { color: colors.onSurface, marginBottom: spacing.lg },
+              ]}
+            >
+              Profile Details
+            </Text>
+            <Text
+              style={[
+                typography.bodyMedium,
+                { color: colors.onSurfaceVariant, marginBottom: spacing.xl },
+              ]}
+            >
+              Optional — you can complete this later
+            </Text>
+
+              <Dropdown
+                label="Skill Level"
+                placeholder="Select your level"
+                options={SKILL_OPTIONS}
+                value={formData.skillLevel}
+                onSelect={(val) => updateField('skillLevel', val)}
+                style={{ marginBottom: spacing.lg }}
+              />
+
+              <Dropdown
+                label="Favorite Play Type"
+                placeholder="Select play style"
+                options={PLAY_TYPE_OPTIONS}
+                value={formData.playType}
+                onSelect={(val) => updateField('playType', val)}
+                style={{ marginBottom: spacing.lg }}
+              />
+
+              <Dropdown
+                label="State"
+                placeholder="Select your state"
+                options={US_STATES}
+                value={formData.state}
+                onSelect={(val) => updateField('state', val)}
+                style={{ marginBottom: spacing.lg }}
+              />
+
+              <Input
+                label="City"
+                placeholder="Enter your city"
+                value={formData.city}
+                onChangeText={(t) => updateField('city', t)}
+                containerStyle={{ marginBottom: spacing.xl }}
+              />
+
+            {/* ─── Submit ─── */}
+            <Button
+              title="JOIN THE COMMUNITY"
+              onPress={handleSignup}
+              loading={loading}
+              disabled={!isValid}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+            />
+
+            {/* ─── Footer ─── */}
+            <TouchableOpacity style={styles.footerLink}>
+              <Text style={styles.supportText}>Contact Senior Support</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenWrapper>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+  },
+  header: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+    marginBottom: -35,
+    zIndex: 10,
+  },
+  logo: {
+    width: 380,
+    height: 210,
+  },
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  title: {
+    color: '#0F2C4C',
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    color: '#1B1B1B',
+    marginTop: spacing.xs,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: spacing.xxl,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activeTabWhite: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  tabText: {
+    fontWeight: 'bold',
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  activeTabTextDark: {
+    color: '#111827',
+  },
+  actionButton: {
+    height: 52,
+    marginTop: spacing.xl,
+  },
+  footerLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  supportText: {
+    textDecorationLine: 'underline',
+    color: '#111827',
+    fontSize: 15,
+  },
+});
