@@ -26,6 +26,7 @@ import NotificationsScreen from '../screens/main/NotificationsScreen';
 import PostDetailScreen from '../screens/main/PostDetailScreen';
 import CreatePostScreen from '../screens/main/CreatePostScreen';
 import AboutScreen from '../screens/main/AboutScreen';
+import UserProfileScreen from '../screens/main/UserProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +52,7 @@ export default function AppNavigator() {
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="CreatePost" component={CreatePostScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
