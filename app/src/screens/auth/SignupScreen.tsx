@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { Mail, Lock, User, Phone, ArrowRight } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -26,6 +27,7 @@ import Dropdown from '../../components/common/Dropdown';
 import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { authApi, setToken } from '../../services/api';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -96,13 +98,23 @@ export default function SignupScreen({ navigation }: any) {
     formData.password.trim() &&
     formData.password === formData.confirmPassword;
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!isValid) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const response = await authApi.signup(formData.name, formData.email, formData.password);
+      
+      const token = response.data?.token || response.token;
+      if (token) {
+        await setToken(token);
+      }
+      
       navigation.replace('CreateProfile');
-    }, 800);
+    } catch (error: any) {
+      Alert.alert('Signup Failed', error.message || 'An error occurred during sign up.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

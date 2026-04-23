@@ -16,8 +16,9 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
-import { ArrowRight, ArrowLeft, User, MapPin } from 'lucide-react-native';
+import { ArrowRight, ArrowLeft, User, MapPin, Check } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
@@ -27,6 +28,7 @@ import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { profileApi } from '../../services/api';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -72,11 +74,19 @@ const US_STATES = [
   { label: 'District of Columbia', value: 'DC' },
 ];
 
-const AVAILABILITY_SLOTS = [
-  'Mon AM', 'Mon PM', 'Tue AM', 'Tue PM', 'Wed AM', 'Wed PM',
-  'Thu AM', 'Thu PM', 'Fri AM', 'Fri PM', 'Sat AM', 'Sat PM',
-  'Sun AM', 'Sun PM',
-];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const generateTimeOptions = () => {
+  const options = [];
+  for (let i = 6; i <= 23; i++) {
+    const hour = i > 12 ? i - 12 : i === 0 ? 12 : i;
+    const ampm = i >= 12 ? 'PM' : 'AM';
+    options.push({ label: `${hour}:00 ${ampm}`, value: `${hour}:00 ${ampm}` });
+    options.push({ label: `${hour}:30 ${ampm}`, value: `${hour}:30 ${ampm}` });
+  }
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
 
 const TOTAL_STEPS = 3;
 
@@ -90,25 +100,74 @@ export default function CreateProfileScreen({ navigation }: any) {
     state: '',
     city: '',
     zipCode: '',
-    availability: [] as string[],
+    availability: {} as Record<string, { start: string; end: string }>,
   });
+  const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
 
   const updateField = (field: string, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleAvailability = (slot: string) => {
+  const toggleDay = (day: string) => {
+    setProfile((prev) => {
+      const newAvail = { ...prev.availability };
+      if (newAvail[day]) {
+        delete newAvail[day];
+      } else {
+        newAvail[day] = { start: '5:00 PM', end: '8:00 PM' };
+      }
+      return { ...prev, availability: newAvail };
+    });
+  };
+
+  const updateDayTime = (day: string, field: 'start' | 'end', value: string) => {
     setProfile((prev) => ({
       ...prev,
-      availability: prev.availability.includes(slot)
-        ? prev.availability.filter((s) => s !== slot)
-        : [...prev.availability, slot],
+      availability: {
+        ...prev.availability,
+        [day]: {
+          ...prev.availability[day],
+          [field]: value,
+        },
+      },
     }));
   };
 
-  const handleComplete = () => {
-    navigation.replace('MainTabs');
+  const applyPreset = (preset: string) => {
+    if (preset === 'weekdays_evening') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(d => {
+        avail[d] = { start: '5:00 PM', end: '9:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'weekends') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      ['Sat', 'Sun'].forEach(d => {
+        avail[d] = { start: '9:00 AM', end: '5:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'any') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      DAYS.forEach(d => {
+        avail[d] = { start: '9:00 AM', end: '9:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'clear') {
+      setProfile((prev) => ({ ...prev, availability: {} }));
+    }
+  };
+
+  const handleComplete = async () => {
+    setLoading(true);
+    try {
+      await profileApi.updateProfile(profile);
+      navigation.replace('MainTabs');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -245,50 +304,98 @@ export default function CreateProfileScreen({ navigation }: any) {
                 When Are You Available?
               </Text>
               <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xl }]}>
-                Tap the time slots when you're typically free to play
+                Choose a quick preset or customize your schedule
               </Text>
 
-              <View style={styles.availGrid}>
-                {AVAILABILITY_SLOTS.map((slot) => {
-                  const isSelected = profile.availability.includes(slot);
-                  return (
-                    <TouchableOpacity
-                      key={slot}
-                      onPress={() => toggleAvailability(slot)}
-                      style={[
-                        styles.availSlot,
-                        {
-                          backgroundColor: isSelected
-                            ? colors.primaryContainer
-                            : colors.surfaceContainerHigh,
-                          borderColor: isSelected ? colors.primary : colors.transparent,
-                          borderWidth: isSelected ? 1.5 : 0,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          typography.labelMedium,
-                          {
-                            color: isSelected ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                          },
-                        ]}
-                      >
-                        {slot}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* ─── Quick Presets ─── */}
+              <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>
+                Quick Select
+              </Text>
+              <View style={styles.presetGrid}>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekdays_evening')}>
+                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekday Evenings</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekends')}>
+                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekends</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('any')}>
+                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Any Time</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.surfaceContainerHigh }]} onPress={() => applyPreset('clear')}>
+                  <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Clear All</Text>
+                </TouchableOpacity>
               </View>
 
-              {profile.availability.length > 0 && (
+              <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xl, opacity: 0.3 }} />
+
+              {/* ─── Custom Schedule ─── */}
+              <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.lg }]}>
+                Custom Schedule
+              </Text>
+
+              {DAYS.map((day) => {
+                const isSelected = !!profile.availability[day];
+                return (
+                  <View key={day} style={styles.dayRow}>
+                    <TouchableOpacity
+                      onPress={() => toggleDay(day)}
+                      style={{ flexDirection: 'row', alignItems: 'center', width: 80 }}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        ]}
+                      >
+                        {isSelected && <Check color="white" size={14} />}
+                      </View>
+                      <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600' }]}>
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {isSelected ? (
+                      <View style={styles.timeSelectRow}>
+                        <Dropdown
+                          options={TIME_OPTIONS}
+                          value={profile.availability[day].start}
+                          onSelect={(val) => updateDayTime(day, 'start', val)}
+                          style={{ flex: 1 }}
+                          triggerStyle={{ minHeight: 40, paddingHorizontal: spacing.sm }}
+                        />
+                        <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginHorizontal: spacing.sm }]}>
+                          to
+                        </Text>
+                        <Dropdown
+                          options={TIME_OPTIONS}
+                          value={profile.availability[day].end}
+                          onSelect={(val) => updateDayTime(day, 'end', val)}
+                          style={{ flex: 1 }}
+                          triggerStyle={{ minHeight: 40, paddingHorizontal: spacing.sm }}
+                        />
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={{ flex: 1, paddingVertical: 10 }}
+                        onPress={() => toggleDay(day)}
+                      >
+                        <Text style={[typography.bodyMedium, { color: colors.outline, textAlign: 'center' }]}>
+                          Tap to set availability
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+
+              {Object.keys(profile.availability).length > 0 && (
                 <Text
                   style={[
                     typography.bodyMedium,
-                    { color: colors.primary, marginTop: spacing.lg },
+                    { color: colors.primary, marginTop: spacing.xl, textAlign: 'center', fontWeight: '500' },
                   ]}
                 >
-                  {profile.availability.length} slots selected
+                  {Object.keys(profile.availability).length} days selected
                 </Text>
               )}
             </View>
@@ -309,12 +416,17 @@ export default function CreateProfileScreen({ navigation }: any) {
           <Button
             title={step === TOTAL_STEPS ? 'COMPLETE PROFILE' : 'NEXT'}
             onPress={step === TOTAL_STEPS ? handleComplete : () => setStep(step + 1)}
+            loading={step === TOTAL_STEPS && loading}
             icon={
               step < TOTAL_STEPS ? (
                 <ArrowRight color={colors.surfaceContainerLowest} size={18} />
               ) : undefined
             }
-            style={{ flex: step > 1 ? 1 : undefined }}
+            style={{ 
+              flex: step === TOTAL_STEPS ? 1.5 : (step > 1 ? 1 : undefined),
+              paddingHorizontal: step === TOTAL_STEPS ? 12 : 24
+            }}
+            textStyle={step === TOTAL_STEPS ? { fontSize: 13, textAlign: 'center' } : undefined}
           />
         </View>
       </KeyboardAvoidingView>
@@ -350,16 +462,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
   },
-  availGrid: {
+  presetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  availSlot: {
+  presetChip: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
-    minWidth: 80,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeSelectRow: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   navButtons: {

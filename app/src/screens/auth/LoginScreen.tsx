@@ -19,6 +19,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Mail, Lock, ArrowRight } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -26,6 +27,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { authApi, setToken } from '../../services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -35,13 +37,23 @@ export default function LoginScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const response = await authApi.login(email, password);
+      
+      // Save the token on success
+      const token = response.data?.token || response.token;
+      if (token) {
+        await setToken(token);
+      }
+      
       navigation.replace('MainTabs');
-    }, 800);
+    } catch (error: any) {
+      Alert.alert('Login Failed', error.message || 'An error occurred during login.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

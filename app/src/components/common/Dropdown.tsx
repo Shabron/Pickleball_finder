@@ -31,6 +31,7 @@ interface DropdownProps {
   value: string;
   onSelect: (value: string) => void;
   style?: ViewStyle;
+  triggerStyle?: ViewStyle;
 }
 
 export default function Dropdown({
@@ -40,6 +41,7 @@ export default function Dropdown({
   value,
   onSelect,
   style,
+  triggerStyle,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { colors, typography } = useTheme();
@@ -72,6 +74,7 @@ export default function Dropdown({
             borderColor: '#D1D5DB',
             borderWidth: 1,
           },
+          triggerStyle,
         ]}
       >
         <Text

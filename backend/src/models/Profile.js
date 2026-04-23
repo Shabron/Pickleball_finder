@@ -36,7 +36,7 @@ const profileSchema = new mongoose.Schema(
       type: String,
     },
     availability: {
-      type: [String], // e.g. ["Mon AM", "Wed PM"]
+      type: mongoose.Schema.Types.Mixed, // e.g. { Mon: { start: '9:00 AM', end: '5:00 PM' } }
     },
     playStyle: {
       type: String,
