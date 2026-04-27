@@ -21,7 +21,7 @@ const profileSchema = new mongoose.Schema(
     },
     skillLevel: {
       type: String,
-      enum: ['Beginner', 'Intermediate', 'Advanced'],
+      enum: ['beginner', 'lowIntermediate', 'highIntermediate', 'advanced', 'professional'],
     },
     ageRange: {
       type: String, // e.g. "60-65"
@@ -40,7 +40,7 @@ const profileSchema = new mongoose.Schema(
     },
     playStyle: {
       type: String,
-      enum: ['Singles', 'Doubles', 'Both'],
+      enum: ['singles', 'doubles', 'mixed', 'any'],
     },
     location: {
       type: {

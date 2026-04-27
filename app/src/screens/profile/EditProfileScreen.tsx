@@ -3,7 +3,7 @@
  *
  * Re-uses the same fields as CreateProfile but in a single scrollable form.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,13 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { Save, MapPin } from 'lucide-react-native';
+import { Save, MapPin, Check } from 'lucide-react-native';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { API_BASE_URL } from '@env';
+import { profileApi } from '../../services/api';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Input from '../../components/common/Input';
@@ -47,52 +52,197 @@ const US_STATES = [
   { label: 'North Carolina', value: 'NC' }, { label: 'Texas', value: 'TX' },
 ];
 
-const AVAILABILITY_SLOTS = [
-  'Mon AM', 'Mon PM', 'Tue AM', 'Tue PM', 'Wed AM', 'Wed PM',
-  'Thu AM', 'Thu PM', 'Fri AM', 'Fri PM', 'Sat AM', 'Sat PM',
-  'Sun AM', 'Sun PM',
-];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const generateTimeOptions = () => {
+  const options = [];
+  for (let i = 6; i <= 23; i++) {
+    const hour = i > 12 ? i - 12 : i === 0 ? 12 : i;
+    const ampm = i >= 12 ? 'PM' : 'AM';
+    options.push({ label: `${hour}:00 ${ampm}`, value: `${hour}:00 ${ampm}` });
+    options.push({ label: `${hour}:30 ${ampm}`, value: `${hour}:30 ${ampm}` });
+  }
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
+const BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
 export default function EditProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState({
-    name: 'Arthur Smith',
-    bio: 'Retired teacher, love playing pickleball at the courts near Riverside.',
-    ageRange: '60-65',
-    skillLevel: 'intermediate',
-    playStyle: 'doubles',
-    state: 'FL',
-    city: 'Sarasota',
-    zipCode: '34236',
-    availability: ['Mon AM', 'Wed AM', 'Fri AM', 'Sat AM'],
+    name: '',
+    bio: '',
+    ageRange: '',
+    skillLevel: '',
+    playStyle: '',
+    state: '',
+    city: '',
+    zipCode: '',
+    availability: {} as Record<string, { start: string; end: string }>,
   });
+  const [avatarUri, setAvatarUri] = useState<string | undefined>(undefined);
+  const [fetching, setFetching] = useState(true);
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await profileApi.getProfile();
+        const data = res.data;
+        setProfile({
+          name: data?.user?.name || '',
+          bio: data?.bio || '',
+          ageRange: data?.ageRange || '',
+          skillLevel: data?.skillLevel || '',
+          playStyle: data?.playStyle || '',
+          state: data?.state || '',
+          city: data?.city || '',
+          zipCode: data?.zipCode || '',
+          availability: data?.availability || {},
+        });
+        if (data?.avatar) {
+          setAvatarUri(`${BASE_URL}${data.avatar}`);
+        }
+      } catch (error) {
+        console.error("Failed to load profile", error);
+      } finally {
+        setFetching(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const updateField = (field: string, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleAvailability = (slot: string) => {
+  const toggleDay = (day: string) => {
+    setProfile((prev) => {
+      const newAvail = { ...prev.availability };
+      if (newAvail[day]) {
+        delete newAvail[day];
+      } else {
+        newAvail[day] = { start: '5:00 PM', end: '8:00 PM' };
+      }
+      return { ...prev, availability: newAvail };
+    });
+  };
+
+  const updateDayTime = (day: string, field: 'start' | 'end', value: string) => {
     setProfile((prev) => ({
       ...prev,
-      availability: prev.availability.includes(slot)
-        ? prev.availability.filter((s) => s !== slot)
-        : [...prev.availability, slot],
+      availability: {
+        ...prev.availability,
+        [day]: {
+          ...prev.availability[day],
+          [field]: value,
+        },
+      },
     }));
   };
 
-  const handleSave = () => {
+  const applyPreset = (preset: string) => {
+    if (preset === 'weekdays_evening') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(d => {
+        avail[d] = { start: '5:00 PM', end: '9:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'weekends') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      ['Sat', 'Sun'].forEach(d => {
+        avail[d] = { start: '9:00 AM', end: '5:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'any') {
+      const avail: Record<string, { start: string; end: string }> = {};
+      DAYS.forEach(d => {
+        avail[d] = { start: '9:00 AM', end: '9:00 PM' };
+      });
+      setProfile((prev) => ({ ...prev, availability: avail }));
+    } else if (preset === 'clear') {
+      setProfile((prev) => ({ ...prev, availability: {} }));
+    }
+  };
+
+  const processImageResult = async (result: any) => {
+    if (result.didCancel || !result.assets || result.assets.length === 0) {
+      return;
+    }
+    const asset = result.assets[0];
+    if (asset.uri) {
+      try {
+        setLoading(true);
+        const res = await profileApi.uploadAvatar(
+          asset.uri,
+          asset.type || 'image/jpeg',
+          asset.fileName || 'avatar.jpg'
+        );
+        setAvatarUri(`${BASE_URL}${res.avatar}`);
+        Alert.alert('Success', 'Profile photo updated successfully!');
+      } catch (err) {
+        console.error('Failed to upload', err);
+        Alert.alert('Error', 'Failed to upload photo');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handlePickImage = () => {
+    Alert.alert(
+      'Profile Photo',
+      'Choose an option',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const result = await launchCamera({
+              mediaType: 'photo',
+              quality: 0.8,
+            });
+            processImageResult(result);
+          },
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const result = await launchImageLibrary({
+              mediaType: 'photo',
+              quality: 0.8,
+            });
+            processImageResult(result);
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await profileApi.updateProfile(profile);
       navigation.goBack();
-    }, 800);
+    } catch (error) {
+      console.error("Failed to update profile", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <ScreenWrapper>
       <Header title="Edit Profile" showBack onBack={() => navigation.goBack()} />
 
+      {fetching ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -104,9 +254,11 @@ export default function EditProfileScreen({ navigation }: any) {
         >
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <Avatar name={profile.name} size={sizes.avatarXLarge} />
+            <Avatar name={profile.name} uri={avatarUri} size={sizes.avatarXLarge} />
             <TouchableOpacity
               style={[styles.changePhotoBtn, { backgroundColor: colors.secondaryContainer }]}
+              onPress={handlePickImage}
+              disabled={loading}
             >
               <Text style={[typography.labelLarge, { color: colors.onSecondaryContainer }]}>
                 Change Photo
@@ -193,40 +345,101 @@ export default function EditProfileScreen({ navigation }: any) {
           <Text style={[typography.titleLarge, { color: colors.onSurface, marginBottom: spacing.md }]}>
             Availability
           </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}>
-            Tap slots to toggle
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xl }]}>
+            Choose a quick preset or customize your schedule
           </Text>
 
-          <View style={styles.availGrid}>
-            {AVAILABILITY_SLOTS.map((slot) => {
-              const isSelected = profile.availability.includes(slot);
-              return (
+          {/* ─── Quick Presets ─── */}
+          <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>
+            Quick Select
+          </Text>
+          <View style={styles.presetGrid}>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekdays_evening')}>
+              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekday Evenings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekends')}>
+              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekends</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('any')}>
+              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Any Time</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.surfaceContainerHigh }]} onPress={() => applyPreset('clear')}>
+              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Clear All</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xl, opacity: 0.3 }} />
+
+          {/* ─── Custom Schedule ─── */}
+          <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.lg }]}>
+            Custom Schedule
+          </Text>
+
+          {DAYS.map((day) => {
+            const isSelected = !!profile.availability[day];
+            return (
+              <View key={day} style={styles.dayRow}>
                 <TouchableOpacity
-                  key={slot}
-                  onPress={() => toggleAvailability(slot)}
-                  style={[
-                    styles.availSlot,
-                    {
-                      backgroundColor: isSelected
-                        ? colors.primaryContainer
-                        : colors.surfaceContainerHigh,
-                      borderColor: isSelected ? colors.primary : colors.transparent,
-                      borderWidth: isSelected ? 1.5 : 0,
-                    },
-                  ]}
+                  onPress={() => toggleDay(day)}
+                  style={{ flexDirection: 'row', alignItems: 'center', width: 80 }}
                 >
-                  <Text
+                  <View
                     style={[
-                      typography.labelMedium,
-                      { color: isSelected ? colors.onPrimaryContainer : colors.onSurfaceVariant },
+                      styles.checkbox,
+                      isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
                     ]}
                   >
-                    {slot}
+                    {isSelected && <Check color="white" size={14} />}
+                  </View>
+                  <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600' }]}>
+                    {day}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+
+                {isSelected ? (
+                  <View style={styles.timeSelectRow}>
+                    <Dropdown
+                      options={TIME_OPTIONS}
+                      value={profile.availability[day].start}
+                      onSelect={(val) => updateDayTime(day, 'start', val)}
+                      style={{ flex: 1 }}
+                      triggerStyle={{ minHeight: 40, paddingHorizontal: spacing.sm }}
+                    />
+                    <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginHorizontal: spacing.sm }]}>
+                      to
+                    </Text>
+                    <Dropdown
+                      options={TIME_OPTIONS}
+                      value={profile.availability[day].end}
+                      onSelect={(val) => updateDayTime(day, 'end', val)}
+                      style={{ flex: 1 }}
+                      triggerStyle={{ minHeight: 40, paddingHorizontal: spacing.sm }}
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: 10 }}
+                    onPress={() => toggleDay(day)}
+                  >
+                    <Text style={[typography.bodyMedium, { color: colors.outline, textAlign: 'center' }]}>
+                      Tap to set availability
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
+
+          {Object.keys(profile.availability).length > 0 && (
+            <Text
+              style={[
+                typography.bodyMedium,
+                { color: colors.primary, marginTop: spacing.xl, textAlign: 'center', fontWeight: '500' },
+              ]}
+            >
+              {Object.keys(profile.availability).length} days selected
+            </Text>
+          )}
 
           {/* Save */}
           <Button
@@ -238,6 +451,7 @@ export default function EditProfileScreen({ navigation }: any) {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+      )}
     </ScreenWrapper>
   );
 }
@@ -257,16 +471,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
   },
-  availGrid: {
+  presetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  availSlot: {
+  presetChip: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
-    minWidth: 80,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeSelectRow: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
   },
 });

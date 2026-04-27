@@ -3,8 +3,9 @@
  *
  * Shows post author, description, metadata, and "Send Match Request" CTA.
  */
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { postApi, profileApi } from '../../services/api';
 import { MapPin, Clock, Target, Users as UsersIcon } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -15,27 +16,74 @@ import Button from '../../components/common/Button';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
+const formatTimeAgo = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
+
 export default function PostDetailScreen({ navigation, route }: any) {
   const { colors, typography } = useTheme();
+  const postId = route?.params?.postId;
+  const [post, setPost] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data — in production, fetch by route.params.postId
-  const post = {
-    id: route?.params?.postId || '1',
-    author: {
-      name: 'Arthur Smith',
-      level: '3.0',
-      location: 'Sarasota, FL',
-      bio: 'Retired teacher, love playing pickleball at the courts near Riverside.',
-    },
-    title: 'Looking for Doubles Partner',
-    content:
-      'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts. Intermediate level preferred! I usually play from 9-11 AM on weekends.',
-    playStyle: 'Doubles',
-    preferredTime: 'Sat AM, Sun AM',
-    desiredLevel: 'Intermediate',
-    status: 'Open',
-    timeAgo: '1 day ago',
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        if (!postId) return;
+        const postRes = await postApi.getPostById(postId);
+        const postData = postRes.data;
+        setPost(postData);
+
+        if (postData?.author?._id) {
+          try {
+            const profileRes = await profileApi.getProfileByUserId(postData.author._id);
+            setProfile(profileRes.data);
+          } catch (profileErr) {
+            console.error('Failed to fetch author profile:', profileErr);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch post details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [postId]);
+
+  if (loading) {
+    return (
+      <ScreenWrapper>
+        <Header title="Post Details" showBack onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
+  if (!post) {
+    return (
+      <ScreenWrapper>
+        <Header title="Post Details" showBack onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>Post not found</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
+  const location = profile?.city && profile?.state ? `${profile.city}, ${profile.state}` : profile?.state || post.state;
 
   return (
     <ScreenWrapper>
@@ -46,17 +94,20 @@ export default function PostDetailScreen({ navigation, route }: any) {
         showsVerticalScrollIndicator={false}
       >
         {/* ─── Author Card ─── */}
-        <Card elevation={2} padding={spacing.xl}>
+        <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant, marginBottom: spacing.sm, marginLeft: spacing.xs }]}>
+          Author
+        </Text>
+        <Card elevation={1} padding={spacing.xl} style={{ marginBottom: spacing.xl, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.outlineVariant }}>
           <View style={styles.authorRow}>
-            <Avatar name={post.author.name} size={sizes.avatarMedium} />
+            <Avatar name={post.author.name} size={sizes.avatarLarge} uri={profile?.avatar} />
             <View style={styles.authorInfo}>
-              <Text style={[typography.titleMedium, { color: colors.onSurface }]}>
+              <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
                 {post.author.name}
               </Text>
               <View style={styles.authorBadges}>
-                <Badge label={`Level ${post.author.level}`} variant="primary" size="small" />
+                <Badge label={`Level ${profile?.skillLevel || post.skillLevel || 'N/A'}`} variant="primary" size="small" />
                 <Badge
-                  label={post.author.location}
+                  label={location}
                   variant="secondary"
                   size="small"
                   style={{ marginLeft: spacing.xs }}
@@ -64,57 +115,97 @@ export default function PostDetailScreen({ navigation, route }: any) {
               </View>
             </View>
           </View>
+          <View style={styles.divider} />
           <Text
-            style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.md }]}
+            style={[typography.bodyMedium, { color: colors.onSurfaceVariant, fontStyle: profile?.bio ? 'normal' : 'italic' }]}
           >
-            {post.author.bio}
+            {profile?.bio || 'No bio provided.'}
           </Text>
         </Card>
 
         {/* ─── Post Content ─── */}
-        <Card elevation={2} padding={spacing.xl}>
+        <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant, marginBottom: spacing.sm, marginLeft: spacing.xs }]}>
+          Post Details
+        </Text>
+        <Card elevation={2} padding={spacing.xl} style={{ marginBottom: spacing.xl, backgroundColor: '#FFFFFF' }}>
           <View style={styles.postHeader}>
-            <Badge label={post.status} variant="success" size="large" />
+            <Badge label={post.status} variant={post.status === 'Open' ? 'success' : 'surface'} size="large" />
             <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
-              {post.timeAgo}
+              {formatTimeAgo(post.createdAt)}
             </Text>
           </View>
 
-          <Text style={[typography.headlineSmall, { color: colors.onSurface, marginBottom: spacing.md }]}>
+          <Text style={[typography.headlineMedium, { color: colors.onSurface, marginBottom: spacing.md, fontWeight: '700' }]}>
             {post.title}
           </Text>
 
           <Text style={[typography.bodyLarge, { color: colors.onSurface, lineHeight: 26, marginBottom: spacing.xl }]}>
-            {post.content}
+            {post.description}
           </Text>
 
+          <View style={styles.divider} />
+
           {/* Metadata */}
-          <View style={styles.metaGrid}>
-            <View style={styles.metaItem}>
-              <UsersIcon size={18} color={colors.secondary} />
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.sm }]}>
-                {post.playStyle}
-              </Text>
+          <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.md }]}>
+            Match Preferences
+          </Text>
+          <View style={styles.metaContainer}>
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <View style={[styles.iconBox, { backgroundColor: colors.secondaryContainer }]}>
+                  <UsersIcon size={20} color={colors.onSecondaryContainer} />
+                </View>
+                <View style={{ marginLeft: spacing.md }}>
+                  <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>Play Style</Text>
+                  <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '500' }]}>{post.playStyle || 'Any'}</Text>
+                </View>
+              </View>
+              <View style={styles.metaItem}>
+                <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
+                  <Target size={20} color={colors.onPrimaryContainer} />
+                </View>
+                <View style={{ marginLeft: spacing.md }}>
+                  <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>Skill Level</Text>
+                  <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '500' }]}>{post.skillLevel || 'Any Level'}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.metaItem}>
-              <Target size={18} color={colors.primary} />
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.sm }]}>
-                {post.desiredLevel}
-              </Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Clock size={18} color={colors.tertiary} />
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.sm }]}>
-                {post.preferredTime}
-              </Text>
-            </View>
-            <View style={styles.metaItem}>
-              <MapPin size={18} color={colors.secondary} />
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.sm }]}>
-                {post.author.location}
-              </Text>
+
+            <View style={[styles.metaRow, { marginTop: spacing.lg }]}>
+              <View style={styles.metaItem}>
+                <View style={[styles.iconBox, { backgroundColor: colors.surfaceVariant }]}>
+                  <MapPin size={20} color={colors.onSurfaceVariant} />
+                </View>
+                <View style={{ marginLeft: spacing.md }}>
+                  <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>Location</Text>
+                  <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '500' }]}>{location}</Text>
+                </View>
+              </View>
             </View>
           </View>
+
+          {/* Availability */}
+          {profile?.availability && Object.keys(profile.availability).length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.md }]}>
+                Author's Preferred Schedule
+              </Text>
+              <View style={styles.availabilityGrid}>
+                {Object.entries(profile.availability).map(([day, times]: [string, any]) => (
+                  <View key={day} style={styles.availabilityRow}>
+                    <View style={[styles.dayChip, { backgroundColor: colors.secondaryContainer }]}>
+                      <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>{day}</Text>
+                    </View>
+                    <Clock size={16} color={colors.onSurfaceVariant} style={{ marginRight: spacing.sm, marginLeft: spacing.sm }} />
+                    <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '500' }]}>
+                      {times.start} - {times.end}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
         </Card>
 
         {/* ─── Actions ─── */}
@@ -139,6 +230,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.lg,
     paddingBottom: spacing.massive,
+    backgroundColor: '#F7FAFC',
   },
   authorRow: {
     flexDirection: 'row',
@@ -150,7 +242,7 @@ const styles = StyleSheet.create({
   },
   authorBadges: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
   postHeader: {
     flexDirection: 'row',
@@ -158,15 +250,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  metaGrid: {
+  metaContainer: {
+    marginTop: spacing.sm,
+  },
+  metaRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'space-between',
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '45%',
+    flex: 1,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: spacing.lg,
+  },
+  availabilityGrid: {
+    marginTop: spacing.xs,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  dayChip: {
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    minWidth: 50,
+    alignItems: 'center',
   },
 });

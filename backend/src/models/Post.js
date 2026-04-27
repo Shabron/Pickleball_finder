@@ -30,11 +30,11 @@ const postSchema = new mongoose.Schema(
     },
     skillLevel: {
       type: String,
-      enum: ['Beginner', 'Intermediate', 'Advanced'],
+      enum: ['beginner', 'lowIntermediate', 'highIntermediate', 'advanced', 'professional'],
     },
     playStyle: {
       type: String,
-      enum: ['Singles', 'Doubles', 'Both'],
+      enum: ['singles', 'doubles', 'mixed', 'any'],
     },
     preferredTime: {
       type: [String],

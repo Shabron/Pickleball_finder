@@ -1,4 +1,5 @@
 const Profile = require('../models/Profile');
+const User = require('../models/User');
 
 // @desc    Get my profile
 // @route   GET /api/profile/me
@@ -22,8 +23,12 @@ const getMyProfile = async (req, res) => {
 // @access  Private
 const updateMyProfile = async (req, res) => {
   try {
-    const { phone, avatar, bio, skillLevel, ageRange, state, city, zipCode, availability, playStyle, latitude, longitude } =
+    const { phone, avatar, bio, skillLevel, ageRange, state, city, zipCode, availability, playStyle, latitude, longitude, name } =
       req.body;
+
+    if (name) {
+      await User.findByIdAndUpdate(req.user._id, { name });
+    }
 
     let location;
     if (latitude !== undefined || longitude !== undefined) {
@@ -115,4 +120,29 @@ const deleteMyProfile = async (req, res) => {
   }
 };
 
-module.exports = { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile };
+// @desc    Upload profile avatar
+// @route   POST /api/profile/me/avatar
+// @access  Private
+const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please upload an image file' });
+    }
+
+    const avatarUrl = `/uploads/${req.file.filename}`;
+
+    let profile = await Profile.findOne({ user: req.user._id });
+    if (profile) {
+      profile.avatar = avatarUrl;
+      await profile.save();
+    } else {
+      profile = await Profile.create({ user: req.user._id, avatar: avatarUrl, profileComplete: false });
+    }
+
+    res.status(200).json({ success: true, message: 'Avatar uploaded successfully', avatar: avatarUrl });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar };

@@ -4,8 +4,11 @@
  * Themed profile card, badges, menu items with tonal layering.
  * Links to Edit Profile, About, Notifications, Settings, Logout.
  */
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { API_BASE_URL } from '@env';
+import { profileApi } from '../../services/api';
 import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -18,6 +21,45 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 export default function ProfileScreen({ navigation }: any) {
   const { colors, typography, toggleTheme, isDark } = useTheme();
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const formatSkillLevel = (level: string) => {
+    const levels: Record<string, string> = {
+      beginner: 'Beginner',
+      lowIntermediate: 'Low Intermediate',
+      highIntermediate: 'High Intermediate',
+      advanced: 'Advanced',
+      professional: 'Pro',
+    };
+    return levels[level] || level;
+  };
+
+  const formatPlayStyle = (style: string) => {
+    const styles: Record<string, string> = {
+      singles: 'Singles',
+      doubles: 'Doubles',
+      mixed: 'Mixed',
+      any: 'Any Style',
+    };
+    return styles[style] || style;
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProfile = async () => {
+        try {
+          const res = await profileApi.getProfile();
+          setProfileData(res.data);
+        } catch (error) {
+          console.error("Failed to load profile", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchProfile();
+    }, [])
+  );
 
   const handleLogout = () => {
     navigation.replace('Login');
@@ -56,50 +98,65 @@ export default function ProfileScreen({ navigation }: any) {
     <ScreenWrapper>
       <Header title="Profile" />
 
-      <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ─── Profile Card ─── */}
-        <Card elevation={2} padding={spacing.xxl}>
-          <View style={styles.profileHeaderContent}>
-            <Avatar name="Arthur Smith" size={sizes.avatarLarge} />
-
-            <Text
-              style={[typography.headlineSmall, { color: colors.onSurface, marginTop: spacing.md }]}
-            >
-              Arthur Smith
-            </Text>
-            <Text
-              style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}
-            >
-              arthur.s@example.com
-            </Text>
-
-            <View style={styles.badgeRow}>
-              <Badge label="Level 3.0" variant="primary" size="large" />
-              <Badge
-                label="Florida"
-                variant="secondary"
-                size="large"
-                style={{ marginLeft: spacing.sm }}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ─── Profile Card ─── */}
+          <Card elevation={2} padding={spacing.xxl}>
+            <View style={styles.profileHeaderContent}>
+              <Avatar
+                name={profileData?.user?.name || 'User'}
+                uri={profileData?.avatar ? `${API_BASE_URL.replace(/\/api$/, '')}${profileData.avatar}` : undefined}
+                size={sizes.avatarLarge}
               />
-              <Badge
-                label="Doubles"
-                variant="tertiary"
-                size="large"
-                style={{ marginLeft: spacing.sm }}
+
+              <Text
+                style={[typography.headlineSmall, { color: colors.onSurface, marginTop: spacing.md }]}
+              >
+                {profileData?.user?.name || 'Unknown User'}
+              </Text>
+              <Text
+                style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}
+              >
+                {profileData?.user?.email || ''}
+              </Text>
+
+              <View style={styles.badgeRow}>
+                {profileData?.skillLevel && (
+                  <Badge label={formatSkillLevel(profileData.skillLevel)} variant="primary" size="large" />
+                )}
+                {profileData?.state && (
+                  <Badge
+                    label={profileData.state}
+                    variant="secondary"
+                    size="large"
+                    style={{ marginLeft: spacing.sm }}
+                  />
+                )}
+                {profileData?.playStyle && (
+                  <Badge
+                    label={formatPlayStyle(profileData.playStyle)}
+                    variant="tertiary"
+                    size="large"
+                    style={{ marginLeft: spacing.sm }}
+                  />
+                )}
+              </View>
+
+              <Button
+                title="Edit Profile"
+                onPress={() => navigation.navigate('EditProfile')}
+                variant="outline"
+                style={{ width: '100%', marginTop: spacing.lg }}
               />
             </View>
-
-            <Button
-              title="Edit Profile"
-              onPress={() => navigation.navigate('EditProfile')}
-              variant="outline"
-              style={{ width: '100%', marginTop: spacing.lg }}
-            />
-          </View>
-        </Card>
+          </Card>
 
         {/* ─── Stats ─── */}
         <View style={styles.statsRow}>
@@ -170,6 +227,7 @@ export default function ProfileScreen({ navigation }: any) {
           Senior Pickleball v1.0.0
         </Text>
       </ScrollView>
+      )}
     </ScreenWrapper>
   );
 }

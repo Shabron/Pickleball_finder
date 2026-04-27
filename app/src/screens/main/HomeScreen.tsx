@@ -7,8 +7,9 @@
  * - FAB for creating new posts
  * - Responsive layout
  */
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
+import { postApi } from '../../services/api';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -48,39 +49,38 @@ const US_STATES = [
   { label: 'District of Columbia', value: 'DC' },
 ];
 
-const MOCK_POSTS: PartnerPostData[] = [
-  {
-    id: '1',
-    name: 'Arthur S.',
-    level: '3.0',
-    timeAgo: '1 day ago',
-    content: 'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts. Intermediate level preferred!',
-    playStyle: 'Doubles',
-    location: 'Sarasota, FL',
-  },
-  {
-    id: '2',
-    name: 'Betty L.',
-    level: '3.5',
-    timeAgo: '3 hours ago',
-    content: 'Intermediate player seeking a regular Tuesday partner, 10 am. Open to all levels.',
-    playStyle: 'Any',
-    location: 'Tampa, FL',
-  },
-  {
-    id: '3',
-    name: 'Walter K.',
-    level: '4.0',
-    timeAgo: '5 hours ago',
-    content: 'Advanced player looking for competitive practice partners for weekend mornings.',
-    playStyle: 'Singles',
-    location: 'Miami, FL',
-  },
-];
+const formatTimeAgo = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
 
 export default function HomeScreen({ navigation }: any) {
   const [location, setLocation] = useState('FL');
   const [distance, setDistance] = useState(10);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      setLoading(true);
+      try {
+        const res = await postApi.getPosts({ state: location });
+        setPosts(res.data.posts);
+      } catch (error) {
+        console.error('Failed to fetch posts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPosts();
+  }, [location]);
   const { colors, typography } = useTheme();
 
   return (
@@ -130,23 +130,37 @@ export default function HomeScreen({ navigation }: any) {
           Partner Posts
         </Text>
         <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
-          {MOCK_POSTS.length} active posts
+          {posts.length} active posts
         </Text>
       </View>
 
-      <FlatList
-        data={MOCK_POSTS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <PartnerPostCard
-            post={item}
-            onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
-            onMessage={() => navigation.navigate('ChatThread')}
-          />
-        )}
-      />
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <PartnerPostCard
+              post={{
+                id: item._id,
+                name: item.author.name,
+                level: item.skillLevel || 'Unknown',
+                timeAgo: formatTimeAgo(item.createdAt),
+                content: item.description,
+                playStyle: item.playStyle,
+                location: `${item.city ? item.city + ', ' : ''}${item.state}`,
+              }}
+              onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
+              onMessage={() => navigation.navigate('ChatThread')}
+            />
+          )}
+        />
+      )}
 
       <FAB
         icon={<Text style={{ fontSize: 24 }}>🏓</Text>}

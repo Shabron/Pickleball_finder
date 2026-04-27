@@ -4,8 +4,10 @@
  * Shows user's active/closed posts with management actions.
  * Uses tonal layering, themed components, no border dividers.
  */
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { postApi } from '../../services/api';
 import { Plus, Edit2, Trash2 } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -25,29 +27,39 @@ interface MyPost {
   responseCount: number;
 }
 
-const MY_POSTS: MyPost[] = [
-  {
-    id: '1',
-    title: 'Looking for Doubles Partner',
-    content: 'Looking for a mixed doubles partner for next Saturday morning at Riverside Courts.',
-    status: 'Open',
-    timeAgo: 'Just now',
-    responseCount: 3,
-  },
-  {
-    id: '2',
-    title: 'Casual Level 3.0 Play',
-    content: 'My Singles Post: Casual Level 3.0 play. Sarasota Area. Weekday mornings preferred.',
-    status: 'Open',
-    timeAgo: '2 days ago',
-    responseCount: 1,
-  },
-];
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
 
 export default function MyPostsScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderPostItem = ({ item }: { item: MyPost }) => (
+  useFocusEffect(
+    useCallback(() => {
+      const fetchPosts = async () => {
+        try {
+          const res = await postApi.getMyPosts();
+          setPosts(res.data.posts);
+        } catch (error) {
+          console.error("Failed to load my posts", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchPosts();
+    }, [])
+  );
+
+  const renderPostItem = ({ item }: { item: any }) => (
     <Card elevation={2}>
       {/* Status + Time */}
       <View style={styles.postHeader}>
@@ -56,7 +68,7 @@ export default function MyPostsScreen({ navigation }: any) {
           variant={item.status === 'Open' ? 'success' : 'surface'}
         />
         <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
-          {item.timeAgo}
+          {formatTimeAgo(item.createdAt)}
         </Text>
       </View>
 
@@ -68,19 +80,19 @@ export default function MyPostsScreen({ navigation }: any) {
         style={[typography.bodyLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}
         numberOfLines={3}
       >
-        {item.content}
+        {item.description}
       </Text>
 
       {/* Response Count */}
       <Text style={[typography.labelMedium, { color: colors.secondary, marginBottom: spacing.md }]}>
-        {item.responseCount} response{item.responseCount !== 1 ? 's' : ''}
+        0 responses
       </Text>
 
       {/* Actions */}
       <View style={styles.actions}>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: colors.secondaryContainer }]}
-          onPress={() => navigation.navigate('CreatePost', { postId: item.id })}
+          onPress={() => navigation.navigate('CreatePost', { post: item })}
         >
           <Edit2 size={16} color={colors.onSecondaryContainer} />
           <Text
@@ -116,13 +128,18 @@ export default function MyPostsScreen({ navigation }: any) {
 
       <View style={styles.headerContainer}>
         <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
-          My Posts ({MY_POSTS.length} Active)
+          My Posts ({posts.length} Active)
         </Text>
       </View>
 
-      <FlatList
-        data={MY_POSTS}
-        keyExtractor={(item) => item.id}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         renderItem={renderPostItem}
@@ -134,6 +151,7 @@ export default function MyPostsScreen({ navigation }: any) {
           </View>
         }
       />
+      )}
 
       <FAB
         icon={<Plus color={colors.surfaceContainerLowest} size={24} />}

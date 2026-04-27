@@ -29,49 +29,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
 
-const SKILL_OPTIONS = [
-  { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
-  { label: 'Low Intermediate (3.0 - 3.5)', value: 'lowIntermediate' },
-  { label: 'High Intermediate (3.5 - 4.0)', value: 'highIntermediate' },
-  { label: 'Advanced (4.0 - 5.0)', value: 'advanced' },
-  { label: 'Professional (5.0+)', value: 'professional' }
-];
 
-const PLAY_TYPE_OPTIONS = [
-  { label: 'Singles', value: 'singles' },
-  { label: 'Doubles', value: 'doubles' },
-  { label: 'Mixed Doubles', value: 'mixed' },
-  { label: 'Any / All Types', value: 'any' },
-];
-
-const US_STATES = [
-  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
-  { label: 'Arizona', value: 'AZ' }, { label: 'Arkansas', value: 'AR' },
-  { label: 'California', value: 'CA' }, { label: 'Colorado', value: 'CO' },
-  { label: 'Connecticut', value: 'CT' }, { label: 'Delaware', value: 'DE' },
-  { label: 'Florida', value: 'FL' }, { label: 'Georgia', value: 'GA' },
-  { label: 'Hawaii', value: 'HI' }, { label: 'Idaho', value: 'ID' },
-  { label: 'Illinois', value: 'IL' }, { label: 'Indiana', value: 'IN' },
-  { label: 'Iowa', value: 'IA' }, { label: 'Kansas', value: 'KS' },
-  { label: 'Kentucky', value: 'KY' }, { label: 'Louisiana', value: 'LA' },
-  { label: 'Maine', value: 'ME' }, { label: 'Maryland', value: 'MD' },
-  { label: 'Massachusetts', value: 'MA' }, { label: 'Michigan', value: 'MI' },
-  { label: 'Minnesota', value: 'MN' }, { label: 'Mississippi', value: 'MS' },
-  { label: 'Missouri', value: 'MO' }, { label: 'Montana', value: 'MT' },
-  { label: 'Nebraska', value: 'NE' }, { label: 'Nevada', value: 'NV' },
-  { label: 'New Hampshire', value: 'NH' }, { label: 'New Jersey', value: 'NJ' },
-  { label: 'New Mexico', value: 'NM' }, { label: 'New York', value: 'NY' },
-  { label: 'North Carolina', value: 'NC' }, { label: 'North Dakota', value: 'ND' },
-  { label: 'Ohio', value: 'OH' }, { label: 'Oklahoma', value: 'OK' },
-  { label: 'Oregon', value: 'OR' }, { label: 'Pennsylvania', value: 'PA' },
-  { label: 'Rhode Island', value: 'RI' }, { label: 'South Carolina', value: 'SC' },
-  { label: 'South Dakota', value: 'SD' }, { label: 'Tennessee', value: 'TN' },
-  { label: 'Texas', value: 'TX' }, { label: 'Utah', value: 'UT' },
-  { label: 'Vermont', value: 'VT' }, { label: 'Virginia', value: 'VA' },
-  { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
-  { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
-  { label: 'District of Columbia', value: 'DC' },
-];
 
 export default function SignupScreen({ navigation }: any) {
   const [formData, setFormData] = useState({
@@ -80,10 +38,6 @@ export default function SignupScreen({ navigation }: any) {
     phone: '',
     password: '',
     confirmPassword: '',
-    skillLevel: '',
-    playType: '',
-    state: '',
-    city: '',
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
@@ -203,58 +157,7 @@ export default function SignupScreen({ navigation }: any) {
               containerStyle={{ marginBottom: spacing.xl }}
             />
 
-            {/* ─── Profile Details (Optional) ─── */}
-            <Text
-              style={[
-                typography.titleLarge,
-                { color: colors.onSurface, marginBottom: spacing.lg },
-              ]}
-            >
-              Profile Details
-            </Text>
-            <Text
-              style={[
-                typography.bodyMedium,
-                { color: colors.onSurfaceVariant, marginBottom: spacing.xl },
-              ]}
-            >
-              Optional — you can complete this later
-            </Text>
 
-              <Dropdown
-                label="Skill Level"
-                placeholder="Select your level"
-                options={SKILL_OPTIONS}
-                value={formData.skillLevel}
-                onSelect={(val) => updateField('skillLevel', val)}
-                style={{ marginBottom: spacing.lg }}
-              />
-
-              <Dropdown
-                label="Favorite Play Type"
-                placeholder="Select play style"
-                options={PLAY_TYPE_OPTIONS}
-                value={formData.playType}
-                onSelect={(val) => updateField('playType', val)}
-                style={{ marginBottom: spacing.lg }}
-              />
-
-              <Dropdown
-                label="State"
-                placeholder="Select your state"
-                options={US_STATES}
-                value={formData.state}
-                onSelect={(val) => updateField('state', val)}
-                style={{ marginBottom: spacing.lg }}
-              />
-
-              <Input
-                label="City"
-                placeholder="Enter your city"
-                value={formData.city}
-                onChangeText={(t) => updateField('city', t)}
-                containerStyle={{ marginBottom: spacing.xl }}
-              />
 
             {/* ─── Submit ─── */}
             <Button

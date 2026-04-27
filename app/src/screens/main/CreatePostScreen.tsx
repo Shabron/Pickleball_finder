@@ -3,7 +3,7 @@
  *
  * Form with title, description, state, city, skill level, play style, preferred times.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import Button from '../../components/common/Button';
 import Dropdown from '../../components/common/Dropdown';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
+import { postApi } from '../../services/api';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -45,22 +46,17 @@ const US_STATES = [
   { label: 'North Carolina', value: 'NC' }, { label: 'Texas', value: 'TX' },
 ];
 
-const TIME_SLOTS = [
-  'Mon AM', 'Mon PM', 'Tue AM', 'Tue PM', 'Wed AM', 'Wed PM',
-  'Thu AM', 'Thu PM', 'Fri AM', 'Fri PM', 'Sat AM', 'Sat PM',
-  'Sun AM', 'Sun PM',
-];
-
 export default function CreatePostScreen({ navigation, route }: any) {
-  const isEditing = !!route?.params?.postId;
+  const post = route?.params?.post;
+  const isEditing = !!post;
+  
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    state: '',
-    city: '',
-    skillLevel: '',
-    playStyle: '',
-    preferredTimes: [] as string[],
+    title: post?.title || '',
+    description: post?.description || '',
+    state: post?.state || '',
+    city: post?.city || '',
+    skillLevel: post?.skillLevel || '',
+    playStyle: post?.playStyle || '',
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
@@ -69,24 +65,24 @@ export default function CreatePostScreen({ navigation, route }: any) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleTime = (slot: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      preferredTimes: prev.preferredTimes.includes(slot)
-        ? prev.preferredTimes.filter((s) => s !== slot)
-        : [...prev.preferredTimes, slot],
-    }));
-  };
-
   const isValid = formData.title.trim() && formData.description.trim() && formData.state;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      if (isEditing) {
+        await postApi.updatePost(post._id, formData);
+      } else {
+        await postApi.createPost(formData);
+      }
       navigation.goBack();
-    }, 800);
+    } catch (error) {
+      console.error('Failed to submit post:', error);
+      // Handle error gracefully if needed
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,45 +159,6 @@ export default function CreatePostScreen({ navigation, route }: any) {
             style={{ marginBottom: spacing.xxl }}
           />
 
-          {/* Preferred Times */}
-          <Text style={[typography.titleMedium, { color: colors.onSurface, marginBottom: spacing.md }]}>
-            Preferred Times
-          </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}>
-            When would you like to play?
-          </Text>
-
-          <View style={styles.timeGrid}>
-            {TIME_SLOTS.map((slot) => {
-              const isSelected = formData.preferredTimes.includes(slot);
-              return (
-                <TouchableOpacity
-                  key={slot}
-                  onPress={() => toggleTime(slot)}
-                  style={[
-                    styles.timeSlot,
-                    {
-                      backgroundColor: isSelected
-                        ? colors.primaryContainer
-                        : colors.surfaceContainerHigh,
-                      borderColor: isSelected ? colors.primary : colors.transparent,
-                      borderWidth: isSelected ? 1.5 : 0,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      typography.labelMedium,
-                      { color: isSelected ? colors.onPrimaryContainer : colors.onSurfaceVariant },
-                    ]}
-                  >
-                    {slot}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
           <Button
             title={isEditing ? 'UPDATE POST' : 'PUBLISH POST'}
             onPress={handleSubmit}
@@ -220,17 +177,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.massive,
-  },
-  timeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  timeSlot: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.full,
-    minWidth: 80,
-    alignItems: 'center',
   },
 });
