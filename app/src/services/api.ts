@@ -283,3 +283,133 @@ export const postApi = {
     }
   },
 };
+
+export const matchmakingApi = {
+  getNearbyPlayers: async (params: { lat: number; lng: number; radiusKm?: number; skillLevel?: string; playStyle?: string; limit?: number }) => {
+    try {
+      const token = await getToken();
+      const queryParams = new URLSearchParams();
+      if (params.lat !== undefined) queryParams.append('lat', params.lat.toString());
+      if (params.lng !== undefined) queryParams.append('lng', params.lng.toString());
+      if (params.radiusKm !== undefined) queryParams.append('radiusKm', params.radiusKm.toString());
+      if (params.skillLevel !== undefined) queryParams.append('skillLevel', params.skillLevel);
+      if (params.playStyle !== undefined) queryParams.append('playStyle', params.playStyle);
+      if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
+
+      const queryStr = queryParams.toString();
+      const response = await fetch(`${API_BASE_URL}/matchmaking/nearby${queryStr ? `?${queryStr}` : ''}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch nearby players');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get nearby players error:', error);
+      throw error;
+    }
+  },
+};
+
+export const messageApi = {
+  getConversations: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/messages/conversations`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch conversations');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get conversations error:', error);
+      throw error;
+    }
+  },
+
+  getMessages: async (conversationId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/messages/${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch messages');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get messages error:', error);
+      throw error;
+    }
+  },
+
+  sendMessage: async (receiverId: string, content: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ receiverId, content }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send message');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Send message error:', error);
+      throw error;
+    }
+  },
+
+  markAsRead: async (conversationId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/messages/${conversationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to mark messages as read');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('markAsRead error:', error);
+      throw error;
+    }
+  },
+};
+

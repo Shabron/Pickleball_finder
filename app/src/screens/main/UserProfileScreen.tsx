@@ -12,7 +12,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Animated,
   Dimensions,
 } from 'react-native';
@@ -29,120 +28,64 @@ import {
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Badge from '../../components/common/Badge';
+import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AVATAR_SIZE = SCREEN_WIDTH * 0.38;
 
-// ─── Mock data keyed by userId ─────────────────────────────────────────────
-
-const USER_PROFILES: Record<string, any> = {
-  '1': {
-    name: 'Arthur S.',
-    fullName: 'Arthur Stevenson',
-    age: 67,
-    level: '3.0',
-    distance: '1.2 mi',
-    matchScore: 92,
-    playStyle: ['Doubles', 'Mixed'],
-    bio: 'Retired teacher who loves the game. Looking for a consistent doubles partner for weekend mornings at Riverside courts. I believe in friendly competition and always enjoy a good laugh between points!',
-    location: 'Riverside Courts, FL',
-    memberSince: 'March 2024',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/men/67.jpg',
-    stats: { matches: 24, wins: 18, partners: 6 },
-  },
-  '2': {
-    name: 'Betty L.',
-    fullName: 'Betty Lawson',
-    age: 63,
-    level: '3.5',
-    distance: '2.5 mi',
-    matchScore: 85,
-    playStyle: ['Singles', 'Doubles'],
-    bio: 'Former tennis player transitioning to pickleball. I play 4× a week and love competitive but friendly matches. Net play is my specialty — dinking with the best of them!',
-    location: 'Sunrise Park, FL',
-    memberSince: 'January 2024',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/women/52.jpg',
-    stats: { matches: 31, wins: 22, partners: 9 },
-  },
-  '3': {
-    name: 'Clara M.',
-    fullName: 'Clara Monroe',
-    age: 71,
-    level: '2.5',
-    distance: '0.8 mi',
-    matchScore: 78,
-    playStyle: ['Doubles'],
-    bio: 'Just started playing 6 months ago. Looking for patient partners who enjoy the social side of the game. I am still learning but improving every week!',
-    location: 'Community Center, FL',
-    memberSince: 'October 2024',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/71.jpg',
-    stats: { matches: 8, wins: 3, partners: 4 },
-  },
-  '4': {
-    name: 'David K.',
-    fullName: 'David Kim',
-    age: 59,
-    level: '4.0',
-    distance: '3.1 mi',
-    matchScore: 65,
-    playStyle: ['Singles'],
-    bio: 'Competitive player training for local tournaments. I have a strong baseline game and am working on my third-shot drop. Looking for strong singles opponents to sharpen my game.',
-    location: 'Sports Complex, FL',
-    memberSince: 'June 2023',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/44.jpg',
-    stats: { matches: 58, wins: 41, partners: 3 },
-  },
-  '5': {
-    name: 'Eleanor R.',
-    fullName: 'Eleanor Reynolds',
-    age: 68,
-    level: '3.0',
-    distance: '1.8 mi',
-    matchScore: 88,
-    playStyle: ['Doubles', 'Any'],
-    bio: 'Love the camaraderie that comes with pickleball! Active in the senior community and always up for a match. Let\'s hit some dinks together!',
-    location: 'Lakeview Courts, FL',
-    memberSince: 'February 2024',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/68.jpg',
-    stats: { matches: 19, wins: 13, partners: 7 },
-  },
-  '6': {
-    name: 'Frank T.',
-    fullName: 'Frank Torres',
-    age: 74,
-    level: '2.0',
-    distance: '4.0 mi',
-    matchScore: 72,
-    playStyle: ['Doubles'],
-    bio: 'New to the sport but very enthusiastic. My grandchildren got me into it — best decision ever! Looking for patient, encouraging partners.',
-    location: 'Westside Park, FL',
-    memberSince: 'December 2024',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/74.jpg',
-    stats: { matches: 4, wins: 1, partners: 2 },
-  },
-};
-
-const DEFAULT_PROFILE = USER_PROFILES['1'];
+import { profileApi } from '../../services/api';
+import { API_BASE_URL } from '@env';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function UserProfileScreen({ navigation, route }: any) {
   const { colors, typography } = useTheme();
-  const userId = route?.params?.userId ?? '1';
-  const player = USER_PROFILES[userId] ?? DEFAULT_PROFILE;
+  const userId = route?.params?.userId;
+  
+  const [player, setPlayer] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        setLoading(true);
+        if (!userId) return;
+        const res = await profileApi.getProfileByUserId(userId);
+        if (res.success && res.data) {
+          const p = res.data;
+          setPlayer({
+            id: p.user?._id || userId,
+            name: p.user?.name || 'Unknown',
+            fullName: p.user?.name || 'Unknown',
+            age: p.ageRange || 'N/A',
+            level: p.skillLevel || 'N/A',
+            distance: 'Nearby', // Mocked for now
+            matchScore: 85, // Mocked for now
+            playStyle: Array.isArray(p.playStyle) ? p.playStyle : (p.playStyle ? [p.playStyle] : []),
+            bio: p.bio || 'No bio provided.',
+            location: `${p.city ? p.city + ', ' : ''}${p.state || ''}`,
+            memberSince: new Date(p.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+            isOnline: true,
+            avatarUri: p.avatar ? `${API_BASE_URL.replace('/api', '')}${p.avatar}` : undefined,
+            stats: { matches: 0, wins: 0, partners: 0 },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load user profile:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUser();
+  }, [userId]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const barAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!player) return;
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.timing(barAnim, {
@@ -152,7 +95,18 @@ export default function UserProfileScreen({ navigation, route }: any) {
         useNativeDriver: false,
       }),
     ]).start();
-  }, []);
+  }, [player, fadeAnim, barAnim]);
+
+  if (loading || !player) {
+    return (
+      <ScreenWrapper>
+        <Header showLogo title="Senior Pickleball" showBack onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Loading profile...</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
 
   const scoreColor =
     (player.matchScore ?? 0) >= 85
@@ -201,10 +155,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
           <View style={styles.avatarSection}>
             <View style={[styles.avatarOuterRing, { borderColor: colors.primary + '40' }]}>
               <View style={[styles.avatarInnerRing, { borderColor: colors.tertiary + '60' }]}>
-                <Image
-                  source={{ uri: player.avatarUri }}
-                  style={[styles.avatar, { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 }]}
-                />
+                <Avatar name={player.fullName} uri={player.avatarUri} size={AVATAR_SIZE} />
               </View>
             </View>
           </View>
@@ -214,9 +165,11 @@ export default function UserProfileScreen({ navigation, route }: any) {
             <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '800' }]}>
               {player.fullName}
             </Text>
-            <Text style={[typography.headlineSmall, { color: colors.onSurfaceVariant, fontWeight: '400', marginLeft: 6 }]}>
-              {player.age}
-            </Text>
+            {player.age && player.age !== 'N/A' && (
+              <Text style={[typography.headlineSmall, { color: colors.onSurfaceVariant, fontWeight: '400', marginLeft: 6 }]}>
+                {player.age}
+              </Text>
+            )}
             <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
           </View>
 

@@ -129,12 +129,14 @@ export default function PlayerProfileCard({
       <View style={styles.avatarSection}>
         <View style={[styles.avatarOuterRing, { borderColor: colors.primary + '40' }]}>
           <View style={[styles.avatarInnerRing, { borderColor: colors.tertiary + '60' }]}>
-            <Avatar
-              name={player.name}
-              uri={player.avatarUri}
-              size={sizes.avatarXLarge + 40}
-              showOnline={player.isOnline}
-            />
+            <TouchableOpacity onPress={onViewProfile} activeOpacity={0.8}>
+              <Avatar
+                name={player.name}
+                uri={player.avatarUri}
+                size={sizes.avatarXLarge + 40}
+                showOnline={player.isOnline}
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -374,10 +376,5 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1D628B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
 });

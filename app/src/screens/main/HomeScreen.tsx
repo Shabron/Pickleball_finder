@@ -8,8 +8,8 @@
  * - Responsive layout
  */
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
-import { postApi } from '../../services/api';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
+import { postApi, messageApi } from '../../services/api';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -82,6 +82,27 @@ export default function HomeScreen({ navigation }: any) {
     fetchPosts();
   }, [location]);
   const { colors, typography } = useTheme();
+
+  const handleMessage = async (authorId: string, authorName: string) => {
+    try {
+      const res = await messageApi.sendMessage(
+        authorId,
+        "Hi! I saw your post on Pickleball Finder."
+      );
+      if (res.success) {
+        navigation.navigate('ChatThread', {
+          conversationId: res.conversationId,
+          userId: authorId,
+          name: authorName,
+        });
+      } else {
+        Alert.alert('Failed to send message: ' + res.message);
+      }
+    } catch (error: any) {
+      console.error('Failed to message:', error);
+      Alert.alert('Failed to message: ' + error.message);
+    }
+  };
 
   return (
     <ScreenWrapper backgroundColor="#EAF4FC">
@@ -156,7 +177,7 @@ export default function HomeScreen({ navigation }: any) {
                 location: `${item.city ? item.city + ', ' : ''}${item.state}`,
               }}
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
-              onMessage={() => navigation.navigate('ChatThread')}
+              onMessage={() => handleMessage(item.author._id, item.author.name)}
             />
           )}
         />

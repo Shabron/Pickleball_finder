@@ -7,7 +7,7 @@
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
  *  - onEndReached appends more mock players (simulated pagination)
  */
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../component
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { SlidersHorizontal, MapPin, Navigation } from 'lucide-react-native';
+import { matchmakingApi, messageApi } from '../../services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -169,10 +170,75 @@ const NEARBY_PREVIEW = [
 
 export default function SearchScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
-  const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>(INITIAL_PLAYERS);
+  const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
   const loadedExtra = useRef(false);
+
+  useEffect(() => {
+    fetchPlayers();
+  }, []);
+
+  const fetchPlayers = async () => {
+    try {
+      setLoading(true);
+      const res = await matchmakingApi.getNearbyPlayers({
+        lat: 27.9606,
+        lng: -82.4572,
+        radiusKm: 20,
+        limit: 25,
+      });
+
+      if (res.success && res.data) {
+        const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => ({
+          id: p.user?._id || p._id,
+          name: p.user?.name || 'Unknown',
+          level: p.skillLevel || 'N/A',
+          distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
+          avatarUri: p.user?.avatar || undefined,
+          matchScore: Math.floor(Math.random() * 40) + 60,
+          playStyle: p.playStyle || 'Any',
+          bio: p.bio || '',
+          isOnline: Math.random() > 0.5,
+          age: p.age || undefined,
+        }));
+        setAllPlayers(mappedPlayers);
+      } else {
+        setAllPlayers([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch players:', error);
+      setAllPlayers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnect = async (player: PlayerProfileData) => {
+    try {
+      // Send an automated intro message
+      const res = await messageApi.sendMessage(
+        player.id,
+        "Hi! I saw you on Pickleball Finder. Let's play!"
+      );
+      if (res.success) {
+        // Navigate to ChatThread screen
+        navigation.navigate('ChatThread', {
+          conversationId: res.conversationId,
+          userId: player.id,
+          name: player.name,
+        });
+      } else {
+        alert('Failed to send message: ' + res.message);
+      }
+    } catch (error: any) {
+      console.error('Failed to connect:', error);
+      alert('Failed to connect: ' + error.message);
+    }
+  };
+
+  const nearbyPreview = allPlayers.length > 0 ? allPlayers.slice(0, 4) : NEARBY_PREVIEW;
 
   // Filter state
   const [showFilter, setShowFilter] = useState(false);
@@ -225,10 +291,9 @@ export default function SearchScreen({ navigation }: any) {
     loadedExtra.current = true;
     setLoadingMore(true);
     setTimeout(() => {
-      setAllPlayers(prev => [...prev, ...MORE_PLAYERS]);
       setLoadingMore(false);
       setAllLoaded(true);
-    }, 1200);
+    }, 500);
   }, [loadingMore, allLoaded]);
 
   // ─── List Header ────────────────────────────────────────────────────
@@ -272,7 +337,7 @@ export default function SearchScreen({ navigation }: any) {
           <View style={[styles.roadV, { backgroundColor: colors.outline + '60', left: '50%' }]} />
 
           {/* Player avatar pins positioned on the "map" */}
-          {NEARBY_PREVIEW.map((p, idx) => {
+          {nearbyPreview.map((p, idx) => {
             const positions = [
               { top: '18%', left: '65%' },
               { top: '60%', left: '22%' },
@@ -317,7 +382,7 @@ export default function SearchScreen({ navigation }: any) {
         <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
           <MapPin size={12} color={colors.onPrimary} />
           <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700', marginLeft: 4 }]}>
-            {NEARBY_PREVIEW.length} players nearby
+            {nearbyPreview.length} players nearby
           </Text>
         </View>
 
@@ -367,12 +432,13 @@ export default function SearchScreen({ navigation }: any) {
       />
 
       <FlatList
+        style={{ flex: 1 }}
         data={players}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <PlayerProfileCard
             player={item}
-            onConnect={() => {}}
+            onConnect={() => handleConnect(item)}
             onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
           />
         )}

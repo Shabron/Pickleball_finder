@@ -22,6 +22,7 @@ import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { messageApi } from '../../services/api';
 
 interface Message {
   id: string;
@@ -39,29 +40,73 @@ const MOCK_MESSAGES: Message[] = [
 ];
 
 export default function ChatThreadScreen({ navigation, route }: any) {
-  const partnerName = route?.params?.name || 'Arthur Smith';
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+  const partnerName = route?.params?.name || 'Partner';
+  const partnerId = route?.params?.userId;
+  const conversationId = route?.params?.conversationId;
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const { colors, typography } = useTheme();
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  React.useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+      // Mark as read immediately upon entering the chat
+      messageApi.markAsRead(conversationId).catch((err) => console.error('Failed to mark read:', err));
 
+      // Simple polling for new messages (could be replaced with websockets)
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [conversationId]);
+
+  const fetchMessages = async () => {
+    try {
+      if (!conversationId) return;
+      const res = await messageApi.getMessages(conversationId);
+      if (res.success && res.data) {
+        const mapped: Message[] = res.data.map((m: any) => ({
+          id: m._id,
+          text: m.content,
+          senderId: m.senderId?._id === partnerId ? 'other' : 'me',
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        setMessages(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages', error);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!inputText.trim() || !partnerId) return;
+
+    // Optimistic update
     const newMessage: Message = {
       id: Date.now().toString(),
       text: inputText.trim(),
       senderId: 'me',
-      time: 'Just now',
+      time: 'Sending...',
     };
 
     setMessages((prev) => [...prev, newMessage]);
+    const textToSend = inputText.trim();
     setInputText('');
 
-    // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
+
+    try {
+      const res = await messageApi.sendMessage(partnerId, textToSend);
+      if (res.success) {
+        fetchMessages(); // Refresh to get actual DB message
+      }
+    } catch (error) {
+      console.error('Failed to send message', error);
+      // Could remove the optimistic message here or show error
+    }
   };
 
   const renderMessage = ({ item }: { item: Message }) => {

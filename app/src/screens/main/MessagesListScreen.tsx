@@ -15,9 +15,11 @@ import Input from '../../components/common/Input';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
+import { messageApi } from '../../services/api';
 
 interface ChatPreview {
-  id: string;
+  id: string; // conversationId
+  userId: string; // partnerId
   name: string;
   timeAgo: string;
   message: string;
@@ -36,9 +38,48 @@ const MOCK_CHATS: ChatPreview[] = [
 
 export default function MessagesListScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [chats, setChats] = useState<ChatPreview[]>([]);
+  const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
 
-  const filteredChats = MOCK_CHATS.filter((chat) =>
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchConversations();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const res = await messageApi.getConversations();
+      if (res.success && res.data) {
+        const currentUserId = res.currentUserId;
+        const mapped: ChatPreview[] = res.data.map((conv: any) => {
+          // Find the participant that is NOT the current user
+          const otherParticipant = conv.participants.find((p: any) => p._id !== currentUserId) || conv.participants[0];
+          
+          return {
+            id: conv._id,
+            userId: otherParticipant?._id,
+            name: otherParticipant?.name || 'Unknown',
+            timeAgo: new Date(conv.updatedAt).toLocaleDateString(), // Simple format for now
+            message: conv.lastMessage?.content || 'Started a conversation',
+            unreadCount: conv.unreadCount || 0,
+            avatarUri: undefined,
+            isOnline: true, // Mock
+          };
+        });
+        setChats(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredChats = chats.filter((chat) =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -55,7 +96,7 @@ export default function MessagesListScreen({ navigation }: any) {
               : colors.transparent,
           },
         ]}
-        onPress={() => navigation.navigate('ChatThread', { chatId: item.id, name: item.name })}
+        onPress={() => navigation.navigate('ChatThread', { conversationId: item.id, userId: item.userId, name: item.name })}
         activeOpacity={0.7}
       >
         <Avatar name={item.name} uri={item.avatarUri} size={52} showOnline={item.isOnline} />

@@ -51,7 +51,13 @@ export default function Avatar({ uri, name, size = 56, style, showOnline }: Avat
           <Text
             style={[
               typography.titleMedium,
-              { fontSize: size * 0.36, color: colors.onPrimaryContainer },
+              { 
+                fontSize: size * 0.4, 
+                color: colors.onPrimaryContainer,
+                textAlign: 'center',
+                textAlignVertical: 'center',
+                lineHeight: size,
+              },
             ]}
           >
             {getInitials(name)}
