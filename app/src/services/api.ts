@@ -59,6 +59,27 @@ export const authApi = {
       throw error;
     }
   },
+
+  /** Validate the stored token — returns user data or throws if expired/invalid */
+  getMe: async () => {
+    const token = await getToken();
+    if (!token) throw new Error('No token stored');
+
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Token invalid');
+    }
+
+    return await response.json();
+  },
 };
 
 export const profileApi = {
@@ -279,6 +300,53 @@ export const postApi = {
       return await response.json();
     } catch (error) {
       console.error('Update post error:', error);
+      throw error;
+    }
+  },
+
+  getReplies: async (postId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/replies`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch replies');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get replies error:', error);
+      throw error;
+    }
+  },
+
+  addReply: async (postId: string, content: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to add reply');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Add reply error:', error);
       throw error;
     }
   },

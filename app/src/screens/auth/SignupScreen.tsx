@@ -28,6 +28,7 @@ import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 
 
@@ -41,6 +42,7 @@ export default function SignupScreen({ navigation }: any) {
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
+  const { login } = useAuth();
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -57,12 +59,15 @@ export default function SignupScreen({ navigation }: any) {
     setLoading(true);
     try {
       const response = await authApi.signup(formData.name, formData.email, formData.password);
-      
       const token = response.data?.token || response.token;
-      if (token) {
-        await setToken(token);
+      const userData = response.data;
+
+      if (token && userData) {
+        // Persist the session immediately after signup
+        await login(token, { _id: userData._id, name: userData.name, email: userData.email });
       }
-      
+
+      // Go to profile creation — auth state is already set
       navigation.replace('CreateProfile');
     } catch (error: any) {
       Alert.alert('Signup Failed', error.message || 'An error occurred during sign up.');

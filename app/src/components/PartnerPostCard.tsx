@@ -1,15 +1,16 @@
 /**
- * PartnerPostCard — Post card for partner search posts
+ * PartnerPostCard — Post card with inline collapsible replies
  *
  * Follows Stitch "No-Line Rule" — uses tonal layering for action separator.
  * XL corners, theme-aware colors, accessible touch targets.
+ * Replies expand inline Facebook-style below the card actions.
  */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MessageSquare, Bookmark, CornerUpLeft } from 'lucide-react-native';
 import Card from './common/Card';
 import Avatar from './common/Avatar';
-import Badge from './common/Badge';
+import InlineReplies from './InlineReplies';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme/spacing';
 
@@ -26,7 +27,6 @@ export interface PartnerPostData {
 
 interface PartnerPostCardProps {
   post: PartnerPostData;
-  onReply?: () => void;
   onSave?: () => void;
   onMessage?: () => void;
   onPress?: () => void;
@@ -34,7 +34,6 @@ interface PartnerPostCardProps {
 
 export default function PartnerPostCard({
   post,
-  onReply,
   onSave,
   onMessage,
   onPress,
@@ -89,9 +88,13 @@ export default function PartnerPostCard({
             { backgroundColor: colors.surfaceContainerLow },
           ]}
         >
+          {/* Reply action — clicking opens compose inline */}
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={onReply}
+            onPress={(e) => {
+              // Stop card press from firing
+              e.stopPropagation?.();
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <CornerUpLeft size={18} color={colors.onSurfaceVariant} />
@@ -122,6 +125,9 @@ export default function PartnerPostCard({
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── Inline Replies (Facebook-style) ── */}
+        <InlineReplies postId={post.id} />
       </Card>
     </TouchableOpacity>
   );

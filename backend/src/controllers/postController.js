@@ -1,4 +1,5 @@
 const Post = require('../models/Post');
+const Reply = require('../models/Reply');
 
 const stateNeighbors = {
   AL: ['FL', 'GA', 'MS', 'TN'],
@@ -253,5 +254,57 @@ const getPostById = async (req, res) => {
   }
 };
 
-module.exports = { getPosts, createPost, updatePost, getMyPosts, getPostById };
+// @desc    Get replies for a post
+// @route   GET /api/posts/:id/replies
+// @access  Public
+const getReplies = async (req, res) => {
+  try {
+    const replies = await Reply.find({ post: req.params.id })
+      .sort({ createdAt: 1 })
+      .populate('author', 'name email');
+
+    return res.status(200).json({
+      success: true,
+      data: { replies },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Add a reply to a post
+// @route   POST /api/posts/:id/replies
+// @access  Private
+const addReply = async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Reply content is required' });
+    }
+
+    // Ensure the post exists
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    const reply = await Reply.create({
+      post: req.params.id,
+      author: req.user._id,
+      content: content.trim(),
+    });
+
+    const populated = await Reply.findById(reply._id).populate('author', 'name email');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Reply added successfully',
+      data: populated,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getPosts, createPost, updatePost, getMyPosts, getPostById, getReplies, addReply };
 

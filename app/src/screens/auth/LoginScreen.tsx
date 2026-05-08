@@ -28,6 +28,7 @@ import Button from '../../components/common/Button';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -36,19 +37,21 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     setLoading(true);
     try {
       const response = await authApi.login(email, password);
-      
-      // Save the token on success
       const token = response.data?.token || response.token;
-      if (token) {
-        await setToken(token);
+      const userData = response.data;
+
+      if (token && userData) {
+        // login() persists the token and updates isAuthenticated → navigator auto-routes to MainTabs
+        await login(token, { _id: userData._id, name: userData.name, email: userData.email });
+      } else {
+        Alert.alert('Login Failed', 'Unexpected response from server.');
       }
-      
-      navigation.replace('MainTabs');
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'An error occurred during login.');
     } finally {

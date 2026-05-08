@@ -191,4 +191,23 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, forgotPassword, resetPassword };
+// @desc    Get current logged in user
+// @route   GET /api/auth/me
+// @access  Private
+const getMe = async (req, res) => {
+  try {
+    const user = req.user;
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { signup, login, forgotPassword, resetPassword, getMe };

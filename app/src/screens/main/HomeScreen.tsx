@@ -104,6 +104,8 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
+
+
   return (
     <ScreenWrapper backgroundColor="#EAF4FC">
       <Header

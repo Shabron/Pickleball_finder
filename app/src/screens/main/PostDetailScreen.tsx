@@ -13,6 +13,7 @@ import Card from '../../components/common/Card';
 import Avatar from '../../components/common/Avatar';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
+import InlineReplies from '../../components/InlineReplies';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
@@ -206,6 +207,18 @@ export default function PostDetailScreen({ navigation, route }: any) {
               </View>
             </>
           )}
+        </Card>
+
+        {/* ─── Inline Replies ─── */}
+        <Card
+          elevation={1}
+          padding={spacing.lg}
+          style={{ marginBottom: spacing.xl, backgroundColor: '#FFFFFF' }}
+        >
+          <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>
+            💬 Replies
+          </Text>
+          <InlineReplies postId={post._id} />
         </Card>
 
         {/* ─── Actions ─── */}
