@@ -26,15 +26,9 @@ interface ChatPreview {
   unreadCount: number;
   avatarUri?: string;
   isOnline?: boolean;
+  status: string;
+  initiator?: string;
 }
-
-const MOCK_CHATS: ChatPreview[] = [
-  { id: '1', name: 'Arthur Smith', timeAgo: '2m ago', message: 'Are we on for Tuesday? The courts are booked.', unreadCount: 2, isOnline: true },
-  { id: '2', name: 'Clara Martinez', timeAgo: '1h ago', message: "I'm available for mixed doubles in Florida.", unreadCount: 1, isOnline: true },
-  { id: '3', name: 'Walter Kim', timeAgo: '1h ago', message: "Thanks! Let's team up for the next one.", unreadCount: 0, isOnline: false },
-  { id: '4', name: 'Betty Lopez', timeAgo: 'Yesterday', message: 'Sounds great. See you at 9 AM!', unreadCount: 0, isOnline: false },
-  { id: '5', name: 'Robert Chen', timeAgo: '2 days ago', message: "I'm a beginner but eager to learn.", unreadCount: 0, isOnline: false },
-];
 
 export default function MessagesListScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +62,8 @@ export default function MessagesListScreen({ navigation }: any) {
             unreadCount: conv.unreadCount || 0,
             avatarUri: undefined,
             isOnline: true, // Mock
+            status: conv.status,
+            initiator: conv.initiator,
           };
         });
         setChats(mapped);
@@ -82,6 +78,20 @@ export default function MessagesListScreen({ navigation }: any) {
   const filteredChats = chats.filter((chat) =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  const handleAcceptRequest = async (conversationId: string) => {
+    try {
+      const res = await messageApi.acceptRequest(conversationId);
+      if (res.success) {
+        setChats(prev => prev.map(chat => chat.id === conversationId ? { ...chat, status: 'accepted' } : chat));
+      } else {
+        alert('Failed to accept request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error accepting request');
+    }
+  };
 
   const renderChatItem = ({ item }: { item: ChatPreview }) => {
     const hasUnread = item.unreadCount > 0;
@@ -133,17 +143,28 @@ export default function MessagesListScreen({ navigation }: any) {
                   marginRight: spacing.sm,
                 },
               ]}
-              numberOfLines={2}
+              numberOfLines={1}
             >
-              {item.message}
+              {item.status === 'pending' && item.initiator === item.userId 
+                ? 'Requested to connect' 
+                : item.status === 'pending'
+                ? 'Connection request sent'
+                : item.message}
             </Text>
-            {hasUnread && (
+            {item.status === 'pending' && item.initiator === item.userId ? (
+              <TouchableOpacity
+                style={[styles.acceptBtn, { backgroundColor: colors.primary }]}
+                onPress={(e) => { e.stopPropagation(); handleAcceptRequest(item.id); }}
+              >
+                <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700' }]}>Accept</Text>
+              </TouchableOpacity>
+            ) : hasUnread ? (
               <View style={[styles.badge, { backgroundColor: colors.tertiary }]}>
                 <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 10 }]}>
                   {item.unreadCount}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </TouchableOpacity>
@@ -221,5 +242,10 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingTop: spacing.giant,
     alignItems: 'center',
+  },
+  acceptBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
   },
 });

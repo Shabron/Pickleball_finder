@@ -28,6 +28,7 @@ import TabNavigator from './TabNavigator';
 // Deep stack screens (no tabs)
 import ChatThreadScreen from '../screens/messaging/ChatThreadScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
+import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
 import PostDetailScreen from '../screens/main/PostDetailScreen';
 import CreatePostScreen from '../screens/main/CreatePostScreen';
 import AboutScreen from '../screens/main/AboutScreen';
@@ -86,6 +87,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} />
         <Stack.Screen name="CreatePost" component={CreatePostScreen} />
         <Stack.Screen name="About" component={AboutScreen} />

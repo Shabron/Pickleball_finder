@@ -56,6 +56,13 @@ const profileSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    notificationSettings: {
+      requests: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      replies: { type: Boolean, default: true },
+      nearbyUsers: { type: Boolean, default: true },
+      nearbyPosts: { type: Boolean, default: true },
+    },
   },
   {
     timestamps: true,

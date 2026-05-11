@@ -479,5 +479,138 @@ export const messageApi = {
       throw error;
     }
   },
+
+  acceptRequest: async (conversationId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/messages/${conversationId}/accept`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to accept request');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('acceptRequest error:', error);
+      throw error;
+    }
+  },
+};
+
+// ─── NOTIFICATION API ─────────────────────────────────────────────────────────────
+
+export const notificationApi = {
+  getNotifications: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch notifications');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('getNotifications error:', error);
+      throw error;
+    }
+  },
+
+  markAsRead: async (id: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to mark as read');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('markAsRead error:', error);
+      throw error;
+    }
+  },
+
+  markAllAsRead: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to mark all as read');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('markAllAsRead error:', error);
+      throw error;
+    }
+  },
+
+  getSettings: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/notifications/settings`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to get notification settings');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('getSettings error:', error);
+      throw error;
+    }
+  },
+
+  updateSettings: async (settings: any) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/notifications/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ settings }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update notification settings');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('updateSettings error:', error);
+      throw error;
+    }
+  },
 };
 

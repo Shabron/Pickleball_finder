@@ -35,7 +35,7 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AVATAR_SIZE = SCREEN_WIDTH * 0.38;
 
-import { profileApi } from '../../services/api';
+import { profileApi, messageApi } from '../../services/api';
 import { API_BASE_URL } from '@env';
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -70,6 +70,8 @@ export default function UserProfileScreen({ navigation, route }: any) {
             isOnline: true,
             avatarUri: p.avatar ? `${API_BASE_URL.replace('/api', '')}${p.avatar}` : undefined,
             stats: { matches: 0, wins: 0, partners: 0 },
+            connectionStatus: p.connectionStatus || 'none',
+            conversationId: p.conversationId,
           });
         }
       } catch (err) {
@@ -96,6 +98,50 @@ export default function UserProfileScreen({ navigation, route }: any) {
       }),
     ]).start();
   }, [player, fadeAnim, barAnim]);
+
+  const handleConnect = async () => {
+    try {
+      if (player.connectionStatus === 'accepted') {
+        navigation.navigate('ChatThread', {
+          conversationId: player.conversationId,
+          userId: player.id,
+          name: player.fullName,
+        });
+        return;
+      }
+
+      if (player.connectionStatus === 'pending_received' && player.conversationId) {
+        const res = await messageApi.acceptRequest(player.conversationId);
+        if (res.success) {
+          setPlayer(prev => ({ ...prev, connectionStatus: 'accepted' }));
+          navigation.navigate('ChatThread', {
+            conversationId: player.conversationId,
+            userId: player.id,
+            name: player.fullName,
+          });
+        }
+        return;
+      }
+
+      if (player.connectionStatus === 'pending_sent') {
+        return; // Already sent, do nothing
+      }
+
+      // Default: Send an automated intro message
+      const res = await messageApi.sendMessage(
+        player.id,
+        "Hi! I saw you on Pickleball Finder. Let's play!"
+      );
+      if (res.success) {
+        setPlayer(prev => ({ ...prev, connectionStatus: 'pending_sent', conversationId: res.conversationId }));
+      } else {
+        alert('Failed to send message: ' + res.message);
+      }
+    } catch (error: any) {
+      console.error('Failed to connect:', error);
+      alert('Failed to connect: ' + error.message);
+    }
+  };
 
   if (loading || !player) {
     return (
@@ -263,7 +309,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
           <TouchableOpacity
             style={[styles.btnMessage, { borderColor: colors.primary }]}
             activeOpacity={0.75}
-            onPress={() => navigation.navigate('ChatThread', { userId, name: player.fullName })}
+            onPress={() => navigation.navigate('ChatThread', { userId, name: player.fullName, conversationId: player.conversationId })}
           >
             <MessageCircle size={18} color={colors.primary} />
             <Text style={[typography.labelLarge, { color: colors.primary, fontWeight: '700', marginLeft: 6 }]}>
@@ -272,11 +318,22 @@ export default function UserProfileScreen({ navigation, route }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.btnConnect, { backgroundColor: colors.primary }]}
+            style={[
+              styles.btnConnect,
+              { backgroundColor: player.connectionStatus === 'pending_sent' ? colors.surfaceContainerHighest : colors.primary }
+            ]}
             activeOpacity={0.8}
+            onPress={handleConnect}
+            disabled={player.connectionStatus === 'pending_sent'}
           >
-            <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>
-              👋 Connect
+            <Text style={[
+              typography.labelLarge,
+              { color: player.connectionStatus === 'pending_sent' ? colors.onSurfaceVariant : colors.onPrimary, fontWeight: '700' }
+            ]}>
+              {player.connectionStatus === 'accepted' ? '💬 Message' :
+               player.connectionStatus === 'pending_sent' ? '⏳ Requested' :
+               player.connectionStatus === 'pending_received' ? '✅ Accept Request' :
+               '👋 Connect'}
             </Text>
           </TouchableOpacity>
         </View>

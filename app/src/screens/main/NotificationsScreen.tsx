@@ -11,36 +11,76 @@ import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { notificationApi } from '../../services/api';
 
 interface Notification {
   id: string;
-  type: 'match_request' | 'match_accepted' | 'new_message' | 'new_post';
-  title: string;
-  body: string;
-  timeAgo: string;
-  read: boolean;
+  referenceId?: string;
 }
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: '1', type: 'match_request', title: 'New Partner Request!', body: 'Martha wants to play with you', timeAgo: '5m ago', read: false },
-  { id: '2', type: 'match_accepted', title: "It's a Match! 🎉", body: 'Robert accepted your request.', timeAgo: '1h ago', read: false },
-  { id: '3', type: 'new_message', title: 'New Message', body: 'Martha: See you at the court tomorrow!', timeAgo: '2h ago', read: false },
-  { id: '4', type: 'new_post', title: 'New Post in Florida', body: 'Looking for doubles partner in Miami', timeAgo: '3h ago', read: true },
-  { id: '5', type: 'new_message', title: 'New Message', body: 'Walter: Hey, great game yesterday!', timeAgo: 'Yesterday', read: true },
-  { id: '6', type: 'match_request', title: 'New Partner Request!', body: 'Clara wants to play with you', timeAgo: '2 days ago', read: true },
-];
 
 export default function NotificationsScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
 
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const res = await notificationApi.getNotifications();
+      if (res.success && res.data) {
+        const mapped = res.data.map((n: any) => ({
+          id: n._id,
+          type: n.type,
+          title: n.title,
+          body: n.body,
+          timeAgo: new Date(n.createdAt).toLocaleDateString(), // simplified
+          read: n.read,
+          referenceId: n.referenceId,
+        }));
+        setNotifications(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notifications', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePress = async (item: Notification) => {
+    if (!item.read) {
+      try {
+        await notificationApi.markAsRead(item.id);
+        setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+      } catch (error) {
+        console.error('Failed to mark read', error);
+      }
+    }
+
+    // Navigation logic based on notification type
+    if (item.type === 'request_sent' || item.type === 'request_accepted' || item.type === 'new_message') {
+      navigation.navigate('MainTabs', { screen: 'Messages' });
+    } else if (item.type === 'new_post_nearby' || item.type === 'new_reply') {
+      if (item.referenceId) navigation.navigate('PostDetail', { postId: item.referenceId });
+    } else if (item.type === 'new_user_nearby') {
+      if (item.referenceId) navigation.navigate('UserProfile', { userId: item.referenceId });
+    }
+  };
+
   const getIcon = (type: Notification['type']) => {
-    const iconMap = {
-      match_request: <Heart size={22} color={colors.tertiary} />,
-      match_accepted: <Users size={22} color={colors.primary} />,
+    const iconMap: any = {
+      request_sent: <Heart size={22} color={colors.tertiary} />,
+      request_accepted: <Users size={22} color={colors.primary} />,
       new_message: <MessageSquare size={22} color={colors.secondary} />,
-      new_post: <FileText size={22} color={colors.onSurfaceVariant} />,
+      new_reply: <MessageSquare size={22} color={colors.secondary} />,
+      new_post_nearby: <FileText size={22} color={colors.onSurfaceVariant} />,
+      new_user_nearby: <Users size={22} color={colors.primary} />,
     };
-    return iconMap[type];
+    return iconMap[type] || <Heart size={22} color={colors.tertiary} />;
   };
 
   const renderItem = ({ item }: { item: Notification }) => (
@@ -54,6 +94,7 @@ export default function NotificationsScreen({ navigation }: any) {
         },
       ]}
       activeOpacity={0.7}
+      onPress={() => handlePress(item)}
     >
       <View style={[styles.iconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
         {getIcon(item.type)}
@@ -100,7 +141,7 @@ export default function NotificationsScreen({ navigation }: any) {
       <Header title="Notifications" showBack onBack={() => navigation.goBack()} />
 
       <FlatList
-        data={MOCK_NOTIFICATIONS}
+        data={notifications}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContainer}
@@ -111,7 +152,7 @@ export default function NotificationsScreen({ navigation }: any) {
             <Text
               style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center' }]}
             >
-              No notifications yet.
+              {loading ? 'Loading...' : 'No notifications yet.'}
             </Text>
           </View>
         }

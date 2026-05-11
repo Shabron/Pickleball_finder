@@ -1,5 +1,7 @@
 const Profile = require('../models/Profile');
 const User = require('../models/User');
+const Conversation = require('../models/Conversation');
+const Notification = require('../models/Notification');
 
 // @desc    Get my profile
 // @route   GET /api/profile/me
@@ -12,7 +14,16 @@ const getMyProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Profile not found. Please create your profile.' });
     }
 
-    res.status(200).json({ success: true, data: profile });
+    const unreadNotificationsCount = await Notification.countDocuments({
+      recipient: req.user._id,
+      read: false,
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      data: profile,
+      unreadNotificationsCount
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -68,7 +79,12 @@ const updateMyProfile = async (req, res) => {
 
     let profile = await Profile.findOne({ user: req.user._id });
 
+    let isNewlyCompleted = false;
+
     if (profile) {
+      if (!profile.profileComplete && profileFields.profileComplete) {
+        isNewlyCompleted = true;
+      }
       // Update existing
       profile = await Profile.findOneAndUpdate({ user: req.user._id }, { $set: profileFields }, { new: true }).populate(
         'user',
@@ -78,6 +94,33 @@ const updateMyProfile = async (req, res) => {
       // Create new
       profile = await Profile.create(profileFields);
       profile = await Profile.findById(profile._id).populate('user', 'name email');
+      isNewlyCompleted = true;
+    }
+
+    // Notification Logic for New User Nearby
+    try {
+      if (isNewlyCompleted && profile.state) {
+        const nearbyProfiles = await Profile.find({
+          state: profile.state,
+          user: { $ne: req.user._id }
+        });
+        
+        const notificationsToInsert = nearbyProfiles
+          .filter(p => p.notificationSettings?.nearbyUsers !== false)
+          .map(p => ({
+            recipient: p.user,
+            type: 'new_user_nearby',
+            title: 'New Player Nearby',
+            body: `${profile.user.name} just joined Pickleball Finder in your area.`,
+            referenceId: profile.user._id,
+          }));
+
+        if (notificationsToInsert.length > 0) {
+          await Notification.insertMany(notificationsToInsert);
+        }
+      }
+    } catch (notifErr) {
+      console.error('Failed to send new user notifications', notifErr);
     }
 
     res.status(200).json({ success: true, message: 'Profile updated successfully', data: profile });
@@ -97,7 +140,27 @@ const getProfileByUserId = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Profile not found' });
     }
 
-    res.status(200).json({ success: true, data: profile });
+    let connectionStatus = 'none';
+    let conversationId = null;
+
+    if (req.user && req.user._id) {
+      const conv = await Conversation.findOne({
+        participants: { $all: [req.user._id, req.params.userId] },
+      });
+
+      if (conv) {
+        conversationId = conv._id;
+        if (conv.status === 'accepted') {
+          connectionStatus = 'accepted';
+        } else if (conv.status === 'pending') {
+          connectionStatus = (conv.initiator && conv.initiator.toString() === req.user._id.toString())
+            ? 'pending_sent'
+            : 'pending_received';
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, data: { ...profile.toObject(), connectionStatus, conversationId } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

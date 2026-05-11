@@ -202,6 +202,8 @@ export default function SearchScreen({ navigation }: any) {
           bio: p.bio || '',
           isOnline: Math.random() > 0.5,
           age: p.age || undefined,
+          connectionStatus: p.connectionStatus || 'none',
+          conversationId: p.conversationId,
         }));
         setAllPlayers(mappedPlayers);
       } else {
@@ -217,18 +219,43 @@ export default function SearchScreen({ navigation }: any) {
 
   const handleConnect = async (player: PlayerProfileData) => {
     try {
-      // Send an automated intro message
+      if (player.connectionStatus === 'accepted') {
+        navigation.navigate('ChatThread', {
+          conversationId: player.conversationId,
+          userId: player.id,
+          name: player.name,
+        });
+        return;
+      }
+
+      if (player.connectionStatus === 'pending_received' && player.conversationId) {
+        const res = await messageApi.acceptRequest(player.conversationId);
+        if (res.success) {
+          setAllPlayers(prev => prev.map(p => 
+            p.id === player.id ? { ...p, connectionStatus: 'accepted' } : p
+          ));
+          navigation.navigate('ChatThread', {
+            conversationId: player.conversationId,
+            userId: player.id,
+            name: player.name,
+          });
+        }
+        return;
+      }
+
+      if (player.connectionStatus === 'pending_sent') {
+        return; // Already sent, do nothing
+      }
+
+      // Default: Send an automated intro message (creates pending request)
       const res = await messageApi.sendMessage(
         player.id,
         "Hi! I saw you on Pickleball Finder. Let's play!"
       );
       if (res.success) {
-        // Navigate to ChatThread screen
-        navigation.navigate('ChatThread', {
-          conversationId: res.conversationId,
-          userId: player.id,
-          name: player.name,
-        });
+        setAllPlayers(prev => prev.map(p => 
+          p.id === player.id ? { ...p, connectionStatus: 'pending_sent', conversationId: res.conversationId } : p
+        ));
       } else {
         alert('Failed to send message: ' + res.message);
       }

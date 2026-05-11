@@ -46,6 +46,8 @@ export default function ChatThreadScreen({ navigation, route }: any) {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [convStatus, setConvStatus] = useState<string>('accepted');
+  const [initiator, setInitiator] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
   const { colors, typography } = useTheme();
 
@@ -73,6 +75,10 @@ export default function ChatThreadScreen({ navigation, route }: any) {
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
         setMessages(mapped);
+        if (res.conversationStatus) {
+          setConvStatus(res.conversationStatus);
+          setInitiator(res.initiator);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch messages', error);
@@ -197,34 +203,46 @@ export default function ChatThreadScreen({ navigation, route }: any) {
 
         {/* ─── Input Bar ─── */}
         <View style={[styles.inputContainer, { backgroundColor: colors.surfaceContainerLow }]}>
-          <TextInput
-            style={[
-              typography.bodyLarge,
-              styles.input,
-              {
-                backgroundColor: colors.surfaceContainerHighest,
-                color: colors.onSurface,
-              },
-            ]}
-            placeholder="Type a message..."
-            placeholderTextColor={colors.onSurfaceVariant}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              {
-                backgroundColor: inputText.trim() ? colors.primary : colors.outlineVariant,
-              },
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim()}
-          >
-            <Send color={colors.surfaceContainerLowest} size={20} style={{ marginLeft: -2 }} />
-          </TouchableOpacity>
+          {convStatus === 'pending' ? (
+            <View style={{ flex: 1, alignItems: 'center', paddingVertical: spacing.sm }}>
+              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
+                {initiator && initiator !== partnerId 
+                  ? 'Waiting for them to accept your request.' 
+                  : 'Please accept the request to start messaging.'}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={[
+                  typography.bodyLarge,
+                  styles.input,
+                  {
+                    backgroundColor: colors.surfaceContainerHighest,
+                    color: colors.onSurface,
+                  },
+                ]}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.onSurfaceVariant}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  {
+                    backgroundColor: inputText.trim() ? colors.primary : colors.outlineVariant,
+                  },
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim()}
+              >
+                <Send color={colors.surfaceContainerLowest} size={20} style={{ marginLeft: -2 }} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </ScreenWrapper>

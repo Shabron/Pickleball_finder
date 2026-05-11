@@ -38,6 +38,8 @@ export interface PlayerProfileData {
   bio?: string;
   isOnline?: boolean;
   age?: number;
+  connectionStatus?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
+  conversationId?: string;
 }
 
 interface PlayerProfileCardProps {
@@ -237,11 +239,21 @@ export default function PlayerProfileCard({
 
         <TouchableOpacity
           onPress={onConnect}
-          style={[styles.btnFilled, { backgroundColor: colors.primary }]}
+          style={[
+            styles.btnFilled,
+            { backgroundColor: player.connectionStatus === 'pending_sent' ? colors.surfaceContainerHighest : colors.primary }
+          ]}
           activeOpacity={0.8}
+          disabled={player.connectionStatus === 'pending_sent'}
         >
-          <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>
-            👋 Connect
+          <Text style={[
+            typography.labelLarge,
+            { color: player.connectionStatus === 'pending_sent' ? colors.onSurfaceVariant : colors.onPrimary, fontWeight: '700' }
+          ]}>
+            {player.connectionStatus === 'accepted' ? '💬 Message' :
+             player.connectionStatus === 'pending_sent' ? '⏳ Requested' :
+             player.connectionStatus === 'pending_received' ? '✅ Accept Request' :
+             '👋 Connect'}
           </Text>
         </TouchableOpacity>
       </View>

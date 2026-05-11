@@ -9,7 +9,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
-import { postApi, messageApi } from '../../services/api';
+import { useFocusEffect } from '@react-navigation/native';
+import { postApi, messageApi, profileApi } from '../../services/api';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -66,6 +67,24 @@ export default function HomeScreen({ navigation }: any) {
   const [distance, setDistance] = useState(10);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notifications count whenever home is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchUnreadCount = async () => {
+        try {
+          const res = await profileApi.getProfile();
+          if (res.success) {
+            setUnreadCount(res.unreadNotificationsCount || 0);
+          }
+        } catch (error) {
+          console.error('Failed to fetch unread notifications count:', error);
+        }
+      };
+      fetchUnreadCount();
+    }, [])
+  );
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -111,7 +130,7 @@ export default function HomeScreen({ navigation }: any) {
       <Header
         showLogo
         showNotificationBell
-        notificationCount={3}
+        notificationCount={unreadCount}
         onNotificationPress={() => navigation.navigate('Notifications')}
         style={{ backgroundColor: 'transparent' }}
       />

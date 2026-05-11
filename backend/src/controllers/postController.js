@@ -1,5 +1,7 @@
 const Post = require('../models/Post');
 const Reply = require('../models/Reply');
+const Notification = require('../models/Notification');
+const Profile = require('../models/Profile');
 
 const stateNeighbors = {
   AL: ['FL', 'GA', 'MS', 'TN'],
@@ -168,6 +170,34 @@ const createPost = async (req, res) => {
     // Populate author details for client display
     const populatedPost = await Post.findById(post._id).populate('author', 'name email');
 
+    // Notification Logic for New Post Nearby
+    try {
+      // Find all profiles in the same state (basic proximity) with nearbyPosts enabled
+      const nearbyProfiles = await Profile.find({
+        state: state,
+        user: { $ne: req.user._id }
+      });
+      
+      const authorProfile = await Profile.findOne({ user: req.user._id }).populate('user', 'name');
+      const authorName = authorProfile?.user?.name || 'Someone';
+
+      const notificationsToInsert = nearbyProfiles
+        .filter(p => p.notificationSettings?.nearbyPosts !== false)
+        .map(p => ({
+          recipient: p.user,
+          type: 'new_post_nearby',
+          title: `New Post in ${state}`,
+          body: `${authorName} is looking to play: ${title}`,
+          referenceId: post._id,
+        }));
+
+      if (notificationsToInsert.length > 0) {
+        await Notification.insertMany(notificationsToInsert);
+      }
+    } catch (notifErr) {
+      console.error('Failed to send new post notifications', notifErr);
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Post created successfully',
@@ -295,6 +325,27 @@ const addReply = async (req, res) => {
     });
 
     const populated = await Reply.findById(reply._id).populate('author', 'name email');
+
+    // Notification Logic for New Reply
+    try {
+      if (post.author.toString() !== req.user._id.toString()) {
+        const postOwnerProfile = await Profile.findOne({ user: post.author });
+        const replierProfile = await Profile.findOne({ user: req.user._id }).populate('user', 'name');
+        const replierName = replierProfile?.user?.name || 'Someone';
+
+        if (postOwnerProfile?.notificationSettings?.replies !== false) {
+          await Notification.create({
+            recipient: post.author,
+            type: 'new_reply',
+            title: 'New Reply on your Post',
+            body: `${replierName} replied: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            referenceId: post._id,
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('Failed to send reply notification', notifErr);
+    }
 
     return res.status(201).json({
       success: true,

@@ -23,6 +23,7 @@ export default function ProfileScreen({ navigation }: any) {
   const { colors, typography, toggleTheme, isDark } = useTheme();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const formatSkillLevel = (level: string) => {
     const levels: Record<string, string> = {
@@ -51,6 +52,7 @@ export default function ProfileScreen({ navigation }: any) {
         try {
           const res = await profileApi.getProfile();
           setProfileData(res.data);
+          setUnreadCount(res.unreadNotificationsCount || 0);
         } catch (error) {
           console.error("Failed to load profile", error);
         } finally {
@@ -75,17 +77,12 @@ export default function ProfileScreen({ navigation }: any) {
       icon: <Bell size={sizes.iconSmall} color={colors.tertiary} />,
       label: 'Notifications',
       onPress: () => navigation.navigate('Notifications'),
-      badge: 3,
+      badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       icon: <Settings size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
-      label: 'Account Settings',
-      onPress: () => {},
-    },
-    {
-      icon: <Shield size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
-      label: `${isDark ? 'Light' : 'Dark'} Mode`,
-      onPress: toggleTheme,
+      label: 'Notification Settings',
+      onPress: () => navigation.navigate('NotificationSettings'),
     },
     {
       icon: <Info size={sizes.iconSmall} color={colors.secondary} />,
