@@ -135,9 +135,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   logo: {
-    width: 60,
-    height: 60,
-    transform: [{ scale: 1.6 }],
+    width: 44,
+    height: 44,
   },
   backButton: {
     padding: spacing.xs,

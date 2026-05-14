@@ -155,13 +155,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: -35,
-    zIndex: 10,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   logo: {
-    width: 380,
-    height: 210,
+    width: 160,
+    height: 160,
   },
   welcomeSection: {
     alignItems: 'center',
