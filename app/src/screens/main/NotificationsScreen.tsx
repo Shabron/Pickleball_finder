@@ -15,6 +15,11 @@ import { notificationApi } from '../../services/api';
 
 interface Notification {
   id: string;
+  type: 'request_sent' | 'request_accepted' | 'new_message' | 'new_reply' | 'new_post_nearby' | 'new_user_nearby' | string;
+  title: string;
+  body: string;
+  timeAgo: string;
+  read: boolean;
   referenceId?: string;
 }
 
