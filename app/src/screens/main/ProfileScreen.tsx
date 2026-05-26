@@ -9,6 +9,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
 import { profileApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -21,6 +22,7 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 export default function ProfileScreen({ navigation }: any) {
   const { colors, typography, toggleTheme, isDark } = useTheme();
+  const { logout } = useAuth();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -63,8 +65,12 @@ export default function ProfileScreen({ navigation }: any) {
     }, [])
   );
 
-  const handleLogout = () => {
-    navigation.replace('Login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to logout', error);
+    }
   };
 
   const menuItems = [
@@ -93,7 +99,12 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper>
-      <Header title="Profile" />
+      <Header
+        showLogo
+        showNotificationBell
+        notificationCount={unreadCount}
+        onNotificationPress={() => navigation.navigate('Notifications')}
+      />
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

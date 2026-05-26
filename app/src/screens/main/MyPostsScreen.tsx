@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { postApi } from '../../services/api';
+import { postApi, profileApi } from '../../services/api';
 import { Plus, Edit2, Trash2 } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -42,6 +42,7 @@ export default function MyPostsScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +50,11 @@ export default function MyPostsScreen({ navigation }: any) {
         try {
           const res = await postApi.getMyPosts();
           setPosts(res.data.posts);
+          
+          const profileRes = await profileApi.getProfile();
+          if (profileRes.success) {
+            setUnreadCount(profileRes.unreadNotificationsCount || 0);
+          }
         } catch (error) {
           console.error("Failed to load my posts", error);
         } finally {
@@ -124,7 +130,12 @@ export default function MyPostsScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper>
-      <Header title="My Posts" />
+      <Header
+        showLogo
+        showNotificationBell
+        notificationCount={unreadCount}
+        onNotificationPress={() => navigation.navigate('Notifications')}
+      />
 
       <View style={styles.headerContainer}>
         <Text style={[typography.titleLarge, { color: colors.onSurface }]}>

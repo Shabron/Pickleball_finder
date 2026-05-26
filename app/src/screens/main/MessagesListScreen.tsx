@@ -15,7 +15,7 @@ import Input from '../../components/common/Input';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
-import { messageApi } from '../../services/api';
+import { messageApi, profileApi } from '../../services/api';
 
 interface ChatPreview {
   id: string; // conversationId
@@ -34,6 +34,7 @@ export default function MessagesListScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { colors, typography } = useTheme();
 
   React.useEffect(() => {
@@ -67,6 +68,11 @@ export default function MessagesListScreen({ navigation }: any) {
           };
         });
         setChats(mapped);
+        
+        const profileRes = await profileApi.getProfile();
+        if (profileRes.success) {
+          setUnreadCount(profileRes.unreadNotificationsCount || 0);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch conversations', error);
@@ -173,7 +179,12 @@ export default function MessagesListScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper backgroundColor={colors.surfaceContainerLowest}>
-      <Header title="Messages" />
+      <Header
+        showLogo
+        showNotificationBell
+        notificationCount={unreadCount}
+        onNotificationPress={() => navigation.navigate('Notifications')}
+      />
 
       <View style={styles.container}>
         <Input

@@ -47,8 +47,13 @@ export default function LoginScreen({ navigation }: any) {
       const userData = response.data;
 
       if (token && userData) {
-        // login() persists the token and updates isAuthenticated → navigator auto-routes to MainTabs
-        await login(token, { _id: userData._id, name: userData.name, email: userData.email });
+        // login() persists the token and updates isAuthenticated
+        await login(token, {
+          _id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          profileComplete: userData.profileComplete,
+        });
       } else {
         Alert.alert('Login Failed', 'Unexpected response from server.');
       }

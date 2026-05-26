@@ -21,28 +21,36 @@ interface User {
   _id: string;
   name: string;
   email: string;
+  profileComplete?: boolean;
 }
 
 interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   user: User | null;
-  login: (token: string, user: User) => Promise<void>;
+  isNewSignup: boolean;
+  login: (token: string, user: User, isSignup?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (fields: Partial<User>) => void;
+  clearNewSignup: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
   isAuthenticated: false,
   user: null,
+  isNewSignup: false,
   login: async () => {},
   logout: async () => {},
+  updateUser: () => {},
+  clearNewSignup: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isNewSignup, setIsNewSignup] = useState(false);
 
   // Bootstrap — runs once on app launch
   useEffect(() => {
@@ -67,20 +75,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     bootstrap();
   }, []);
 
-  const login = useCallback(async (token: string, userData: User) => {
+  const login = useCallback(async (token: string, userData: User, isSignup: boolean = false) => {
     await setToken(token);
     setUser(userData);
+    setIsNewSignup(isSignup);
     setIsAuthenticated(true);
   }, []);
 
   const logout = useCallback(async () => {
     await clearToken();
     setUser(null);
+    setIsNewSignup(false);
     setIsAuthenticated(false);
   }, []);
 
+  const updateUser = useCallback((fields: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...fields } : null));
+  }, []);
+
+  const clearNewSignup = useCallback(() => {
+    setIsNewSignup(false);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ isLoading, isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoading, isAuthenticated, user, isNewSignup, login, logout, updateUser, clearNewSignup }}>
       {children}
     </AuthContext.Provider>
   );

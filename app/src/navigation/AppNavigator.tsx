@@ -18,6 +18,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
+import TermsScreen from '../screens/auth/TermsScreen';
 
 // Onboarding / Profile
 import CreateProfileScreen from '../screens/profile/CreateProfileScreen';
@@ -51,20 +52,8 @@ function SplashScreen() {
 }
 
 export default function AppNavigator() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, isNewSignup } = useAuth();
 
-  /**
-   * IMPORTANT: Use a SINGLE NavigationContainer at all times.
-   * Previously two separate NavigationContainers were used (one for
-   * the splash/loading state, one for the main app). Unmounting and
-   * remounting NavigationContainer mid-session causes React Navigation
-   * to lose its internal state, so the navigator never reacted to
-   * isAuthenticated becoming true after login.
-   *
-   * Fix: Keep one NavigationContainer always mounted. Render a
-   * Splash screen while loading, then swap the Stack (via `key`)
-   * once the bootstrap check is complete.
-   */
   return (
     <NavigationContainer>
       {isLoading ? (
@@ -72,24 +61,29 @@ export default function AppNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Splash" component={SplashScreen} />
         </Stack.Navigator>
-      ) : (
-        <Stack.Navigator
-          screenOptions={{ headerShown: false }}
-          // Changing key forces a full Stack remount when auth flips,
-          // which resets initialRouteName correctly.
-          key={isAuthenticated ? 'auth' : 'guest'}
-          initialRouteName={isAuthenticated ? 'MainTabs' : 'Welcome'}
-        >
-          {/* Auth screens (shown when NOT authenticated) */}
+      ) : !isAuthenticated ? (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {/* Guest screens (shown when NOT authenticated) */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
-
-          {/* Onboarding */}
-          <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
-
-          {/* Main App (Tabs) */}
-          <Stack.Screen name="MainTabs" component={TabNavigator} />
+          <Stack.Screen name="Terms" component={TermsScreen} />
+        </Stack.Navigator>
+      ) : (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {isNewSignup ? (
+            <>
+              {/* Onboarding first */}
+              <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+              <Stack.Screen name="MainTabs" component={TabNavigator} />
+            </>
+          ) : (
+            <>
+              {/* Main App (Tabs) first */}
+              <Stack.Screen name="MainTabs" component={TabNavigator} />
+              <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+            </>
+          )}
 
           {/* Deep stack screens */}
           <Stack.Screen name="ChatThread" component={ChatThreadScreen} />

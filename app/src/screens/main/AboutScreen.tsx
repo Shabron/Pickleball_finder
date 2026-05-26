@@ -72,12 +72,26 @@ export default function AboutScreen({ navigation }: any) {
             </Text>
           </View>
           <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant, lineHeight: 26 }]}>
-            Pickleball is the fastest-growing sport in America, with a massive senior community.
-            We built this app to solve a simple problem: finding the right playing partner shouldn't
-            be hard.{'\n\n'}
-            Whether you're a beginner looking for patient partners or an advanced player seeking
-            competitive matches, Senior Pickleball Partner Finder connects you with compatible
-            players near you.
+            Pickleball is one of the fastest growing sports, yet one of its largest demographics — seniors — remains heavily underserved. This is the first app specifically designed for senior pickleball players (50+).{'\n\n'}
+            Our goal is to provide a free, user-friendly platform that allows seniors to connect with other pickleball players in their geographic area — whether for local, state, or national tournaments, or simply for casual play!{'\n\n'}
+            Pickleball promotes cardiovascular fitness, fosters meaningful social connections, and has cognitive benefits that reduce the risk of cognitive decline. We believe every senior deserves a partner on the court.
+          </Text>
+        </View>
+
+        {/* ─── About the Creator ─── */}
+        <View style={[styles.creatorSection, { backgroundColor: colors.primaryContainer }]}>
+          <View style={styles.sectionHeader}>
+            <Users size={22} color={colors.primary} />
+            <Text style={[typography.titleLarge, { color: colors.onPrimaryContainer, marginLeft: spacing.sm }]}>
+              About the Creator
+            </Text>
+          </View>
+          <Text style={[typography.bodyLarge, { color: colors.onPrimaryContainer, lineHeight: 26 }]}>
+            Hi! I'm a junior in high school from New Jersey, personally inspired by my grandmother to build this app. I wanted it as a means to show support for those who once cared for us.{'\n\n'}
+            I am consistently striving to promote both mental and physical fitness in seniors through volunteering efforts within my local community, and I'd love to scale this app nationally.{'\n\n'}
+            💛 First-year subscription proceeds will be donated to{' '}
+            <Text style={{ fontWeight: '700' }}>North Jersey Villages</Text>
+            {' '}— a nonprofit committed to helping seniors age-in-place that I currently volunteer for.
           </Text>
         </View>
 
@@ -140,10 +154,10 @@ export default function AboutScreen({ navigation }: any) {
           </Text>
           <TouchableOpacity
             style={[styles.contactLink, { backgroundColor: colors.secondaryContainer }]}
-            onPress={() => Linking.openURL('mailto:support@seniorpickleball.app')}
+            onPress={() => Linking.openURL('mailto:shauryamspp@gmail.com')}
           >
             <Text style={[typography.titleSmall, { color: colors.onSecondaryContainer }]}>
-              support@seniorpickleball.app
+              shauryamspp@gmail.com
             </Text>
             <ExternalLink size={16} color={colors.onSecondaryContainer} />
           </TouchableOpacity>
@@ -178,6 +192,13 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: spacing.xxl,
     marginBottom: spacing.xxl,
+  },
+  creatorSection: {
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.xxl,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
+    borderRadius: borderRadius.xxl,
   },
   sectionHeader: {
     flexDirection: 'row',

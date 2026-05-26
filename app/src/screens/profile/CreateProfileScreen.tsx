@@ -29,6 +29,7 @@ import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { profileApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -104,6 +105,7 @@ export default function CreateProfileScreen({ navigation }: any) {
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
+  const { updateUser, clearNewSignup } = useAuth();
 
   const updateField = (field: string, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -162,6 +164,8 @@ export default function CreateProfileScreen({ navigation }: any) {
     setLoading(true);
     try {
       await profileApi.updateProfile(profile);
+      updateUser({ profileComplete: true });
+      clearNewSignup();
       navigation.replace('MainTabs');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update profile.');

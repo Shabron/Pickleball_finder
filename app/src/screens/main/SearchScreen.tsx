@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
@@ -25,7 +26,7 @@ import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../component
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { SlidersHorizontal, MapPin, Navigation } from 'lucide-react-native';
-import { matchmakingApi, messageApi } from '../../services/api';
+import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -174,11 +175,25 @@ export default function SearchScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const loadedExtra = useRef(false);
 
-  useEffect(() => {
-    fetchPlayers();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchPlayers();
+      const fetchUnreadCount = async () => {
+        try {
+          const res = await profileApi.getProfile();
+          if (res.success) {
+            setUnreadCount(res.unreadNotificationsCount || 0);
+          }
+        } catch (error) {
+          console.error('Failed to fetch unread notifications count:', error);
+        }
+      };
+      fetchUnreadCount();
+    }, [])
+  );
 
   const fetchPlayers = async () => {
     try {
@@ -453,9 +468,9 @@ export default function SearchScreen({ navigation }: any) {
       {/* ── App header with logo ── */}
       <Header
         showLogo
-        title="Senior Pickleball"
         showNotificationBell
-        notificationCount={3}
+        notificationCount={unreadCount}
+        onNotificationPress={() => navigation.navigate('Notifications')}
       />
 
       <FlatList

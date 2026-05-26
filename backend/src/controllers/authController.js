@@ -92,6 +92,9 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
+    // Check profile
+    const profile = await Profile.findOne({ user: user._id });
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -100,6 +103,7 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         token,
+        profileComplete: profile ? profile.profileComplete : false,
       },
     });
   } catch (error) {
@@ -176,6 +180,9 @@ const resetPassword = async (req, res) => {
     // Auto-login after reset
     const token = generateToken(user._id);
 
+    // Check profile
+    const profile = await Profile.findOne({ user: user._id });
+
     res.status(200).json({
       success: true,
       message: 'Password reset successful',
@@ -184,6 +191,7 @@ const resetPassword = async (req, res) => {
         name: user.name,
         email: user.email,
         token,
+        profileComplete: profile ? profile.profileComplete : false,
       },
     });
   } catch (error) {
@@ -197,12 +205,14 @@ const resetPassword = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = req.user;
+    const profile = await Profile.findOne({ user: user._id });
     res.status(200).json({
       success: true,
       data: {
         _id: user._id,
         name: user.name,
         email: user.email,
+        profileComplete: profile ? profile.profileComplete : false,
       },
     });
   } catch (error) {

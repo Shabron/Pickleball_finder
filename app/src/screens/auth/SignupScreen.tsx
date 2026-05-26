@@ -28,7 +28,6 @@ import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 
 
 
@@ -42,7 +41,6 @@ export default function SignupScreen({ navigation }: any) {
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
-  const { login } = useAuth();
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -63,12 +61,9 @@ export default function SignupScreen({ navigation }: any) {
       const userData = response.data;
 
       if (token && userData) {
-        // Persist the session immediately after signup
-        await login(token, { _id: userData._id, name: userData.name, email: userData.email });
+        // Navigate to the Terms acceptance screen instead of logging in directly
+        navigation.navigate('Terms', { token, userData });
       }
-
-      // Go to profile creation — auth state is already set
-      navigation.replace('CreateProfile');
     } catch (error: any) {
       Alert.alert('Signup Failed', error.message || 'An error occurred during sign up.');
     } finally {
@@ -191,13 +186,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: -35,
-    zIndex: 10,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   logo: {
-    width: 380,
-    height: 210,
+    width: 160,
+    height: 160,
   },
   welcomeSection: {
     alignItems: 'center',
