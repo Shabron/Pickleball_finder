@@ -8,7 +8,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { postApi, profileApi } from '../../services/api';
-import { Plus, Edit2, Trash2 } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, MessageSquare } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Card from '../../components/common/Card';
@@ -66,66 +66,73 @@ export default function MyPostsScreen({ navigation }: any) {
   );
 
   const renderPostItem = ({ item }: { item: any }) => (
-    <Card elevation={2}>
-      {/* Status + Time */}
-      <View style={styles.postHeader}>
-        <Badge
-          label={item.status}
-          variant={item.status === 'Open' ? 'success' : 'surface'}
-        />
-        <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
-          {formatTimeAgo(item.createdAt)}
+    <View style={styles.cardAccentWrapper}>
+      {/* Green left accent bar */}
+      <View style={[styles.leftAccentBar, { backgroundColor: colors.brandGreen }]} />
+      <Card elevation={2} style={{ marginBottom: 0 }}>
+        {/* Status + Time */}
+        <View style={styles.postHeader}>
+          <Badge
+            label={item.status}
+            variant={item.status === 'Open' ? 'success' : 'surface'}
+          />
+          <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+            {formatTimeAgo(item.createdAt)}
+          </Text>
+        </View>
+
+        {/* Title + Content */}
+        <Text style={[typography.titleMedium, { color: colors.onSurface, marginBottom: spacing.xs }]}>
+          {item.title}
         </Text>
-      </View>
-
-      {/* Title + Content */}
-      <Text style={[typography.titleMedium, { color: colors.onSurface, marginBottom: spacing.xs }]}>
-        {item.title}
-      </Text>
-      <Text
-        style={[typography.bodyLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}
-        numberOfLines={3}
-      >
-        {item.description}
-      </Text>
-
-      {/* Response Count */}
-      <Text style={[typography.labelMedium, { color: colors.secondary, marginBottom: spacing.md }]}>
-        0 responses
-      </Text>
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: colors.secondaryContainer }]}
-          onPress={() => navigation.navigate('CreatePost', { post: item })}
+        <Text
+          style={[typography.bodyLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.lg }]}
+          numberOfLines={3}
         >
-          <Edit2 size={16} color={colors.onSecondaryContainer} />
-          <Text
-            style={[
-              typography.labelMedium,
-              { color: colors.onSecondaryContainer, marginLeft: spacing.xs },
-            ]}
-          >
-            Edit
-          </Text>
-        </TouchableOpacity>
+          {item.description}
+        </Text>
 
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: colors.errorContainer + '60' }]}
-        >
-          <Trash2 size={16} color={colors.error} />
-          <Text
-            style={[
-              typography.labelMedium,
-              { color: colors.error, marginLeft: spacing.xs },
-            ]}
-          >
-            Delete
+        {/* Response Count */}
+        <View style={styles.responseCountRow}>
+          <MessageSquare size={16} color={colors.primary} />
+          <Text style={[typography.labelMedium, { color: colors.primary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+            {item.responseCount || 0} response{item.responseCount !== 1 ? 'es' : ''}
           </Text>
-        </TouchableOpacity>
-      </View>
-    </Card>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.secondaryContainer }]}
+            onPress={() => navigation.navigate('CreatePost', { post: item })}
+          >
+            <Edit2 size={16} color={colors.onSecondaryContainer} />
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: colors.onSecondaryContainer, marginLeft: spacing.xs },
+              ]}
+            >
+              Edit
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.errorContainer + '60' }]}
+          >
+            <Trash2 size={16} color={colors.error} />
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: colors.error, marginLeft: spacing.xs },
+              ]}
+            >
+              Delete
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+    </View>
   );
 
   return (
@@ -138,9 +145,15 @@ export default function MyPostsScreen({ navigation }: any) {
       />
 
       <View style={styles.headerContainer}>
-        <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
-          My Posts ({posts.length} Active)
+        <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800' }]}>
+          My Posts
         </Text>
+        <View style={[styles.activeBadge, { backgroundColor: colors.brandGreenContainer }]}>
+          <View style={[styles.activeDot, { backgroundColor: colors.brandGreen }]} />
+          <Text style={[typography.labelMedium, { color: colors.onBrandGreenContainer, fontWeight: '700' }]}>
+            {posts.length} active
+          </Text>
+        </View>
       </View>
 
       {loading ? (
@@ -177,6 +190,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  activeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  cardAccentWrapper: {
+    position: 'relative',
+    borderRadius: borderRadius.xxl,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
+  },
+  leftAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 1,
+  },
+  responseCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   listContainer: {
     paddingHorizontal: spacing.md,

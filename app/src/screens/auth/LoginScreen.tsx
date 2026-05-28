@@ -65,7 +65,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor="#EAF4FC">
+    <ScreenWrapper>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -131,7 +131,7 @@ export default function LoginScreen({ navigation }: any) {
               style={styles.forgotPasswordContainer}
               onPress={() => { /* Navigate to forgot password */ }}
             >
-              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              <Text style={[styles.forgotPasswordText, { color: colors.brandGreen }]}>Forgot password?</Text>
             </TouchableOpacity>
 
             <Button
@@ -145,7 +145,7 @@ export default function LoginScreen({ navigation }: any) {
 
             {/* ─── Footer ─── */}
             <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.supportText}>Contact Senior Support</Text>
+              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Senior Support</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

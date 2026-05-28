@@ -18,7 +18,7 @@ interface ScreenWrapperProps {
 
 export default function ScreenWrapper({ children, style, backgroundColor }: ScreenWrapperProps) {
   const { colors, isDark } = useTheme();
-  const bg = backgroundColor || colors.surface;
+  const bg = backgroundColor || colors.screenBackground;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }, style]}>

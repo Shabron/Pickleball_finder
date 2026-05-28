@@ -41,7 +41,7 @@ export default function TermsScreen({ route, navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor="#EAF4FC">
+    <ScreenWrapper>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.container}>
           {/* Header Area */}

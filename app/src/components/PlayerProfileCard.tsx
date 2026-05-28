@@ -100,15 +100,17 @@ export default function PlayerProfileCard({
   return (
     <Animated.View
       style={[
-        styles.card,
+        styles.cardShadowWrapper,
         {
-          backgroundColor: colors.surface,
           opacity: fadeAnim,
           transform: [{ translateY: slideAnim }],
         },
         style,
       ]}
     >
+      <View style={[styles.cardAccentWrapper, { backgroundColor: colors.surface }]}>
+        {/* Green left accent bar */}
+        <View style={[styles.leftAccentBar, { backgroundColor: colors.brandGreen }]} />
       {/* ─── Match Score Badge (top-right) ─── */}
       {player.matchScore !== undefined && (
         <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
@@ -257,24 +259,39 @@ export default function PlayerProfileCard({
           </Text>
         </TouchableOpacity>
       </View>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  cardShadowWrapper: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xl,
     borderRadius: borderRadius.xxl,
-    padding: spacing.xl,
-    paddingTop: spacing.xxl,
-    alignItems: 'center',
     // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 8,
+  },
+  cardAccentWrapper: {
+    width: '100%',
+    borderRadius: borderRadius.xxl,
+    overflow: 'hidden',
+    position: 'relative',
+    padding: spacing.xl,
+    paddingTop: spacing.xxl,
+    alignItems: 'center',
+  },
+  leftAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 1,
   },
   scoreBadge: {
     position: 'absolute',

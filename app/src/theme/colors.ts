@@ -60,6 +60,13 @@ export const lightColors = {
   success: '#38A169',
   warning: '#D69E2E',
 
+  // Brand Green (Pickleball themed green)
+  brandGreen: '#2E7D32',
+  brandGreenContainer: '#E8F5E9',
+  onBrandGreenContainer: '#1B5E20',
+  homeBackground: '#F0F7F4',
+  screenBackground: '#EAF4FC',
+
   // Utility
   white: '#FFFFFF',
   black: '#000000',
@@ -119,6 +126,13 @@ export const darkColors: ThemeColors = {
 
   success: '#68D391',
   warning: '#F6E05E',
+
+  // Brand Green (Pickleball themed green)
+  brandGreen: '#81C784',
+  brandGreenContainer: '#1B5E20',
+  onBrandGreenContainer: '#E8F5E9',
+  homeBackground: '#16221B',
+  screenBackground: '#171923',
 
   white: '#FFFFFF',
   black: '#000000',

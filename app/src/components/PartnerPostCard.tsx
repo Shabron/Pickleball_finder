@@ -42,7 +42,10 @@ export default function PartnerPostCard({
 
   return (
     <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
-      <Card>
+      <View style={styles.cardAccentWrapper}>
+        {/* Green left accent bar */}
+        <View style={[styles.leftAccentBar, { backgroundColor: colors.brandGreen }]} />
+        <Card style={{ marginBottom: 0 }}>
         {/* Header: Avatar + Name + Time */}
         <View style={styles.header}>
           <Avatar name={post.name} uri={post.avatarUri} size={46} />
@@ -81,7 +84,7 @@ export default function PartnerPostCard({
           </Text>
         )}
 
-        {/* Actions — separated by tonal shift, NOT a border */}
+        {/* Actions — separated by tonal shift */}
         <View
           style={[
             styles.actions,
@@ -129,11 +132,26 @@ export default function PartnerPostCard({
         {/* ── Inline Replies (Facebook-style) ── */}
         <InlineReplies postId={post.id} />
       </Card>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  cardAccentWrapper: {
+    position: 'relative',
+    borderRadius: 28,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
+  },
+  leftAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    zIndex: 1,
+  },
   header: {
     flexDirection: 'row',
     marginBottom: spacing.md,

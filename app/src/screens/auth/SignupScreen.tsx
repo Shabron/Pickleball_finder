@@ -72,7 +72,7 @@ export default function SignupScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor="#EAF4FC">
+    <ScreenWrapper>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -171,7 +171,7 @@ export default function SignupScreen({ navigation }: any) {
 
             {/* ─── Footer ─── */}
             <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.supportText}>Contact Senior Support</Text>
+              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Senior Support</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

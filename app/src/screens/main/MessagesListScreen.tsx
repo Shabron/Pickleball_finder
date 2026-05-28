@@ -107,9 +107,7 @@ export default function MessagesListScreen({ navigation }: any) {
         style={[
           styles.chatRow,
           {
-            backgroundColor: hasUnread
-              ? colors.surfaceContainerLow
-              : colors.transparent,
+            backgroundColor: colors.surfaceContainerLowest,
           },
         ]}
         onPress={() => navigation.navigate('ChatThread', { conversationId: item.id, userId: item.userId, name: item.name })}
@@ -178,7 +176,7 @@ export default function MessagesListScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor={colors.surfaceContainerLowest}>
+    <ScreenWrapper>
       <Header
         showLogo
         showNotificationBell
@@ -200,7 +198,7 @@ export default function MessagesListScreen({ navigation }: any) {
           keyExtractor={(item) => item.id}
           renderItem={renderChatItem}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
           contentContainerStyle={{ paddingBottom: spacing.massive }}
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -219,6 +217,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   chatRow: {
     flexDirection: 'row',
@@ -226,6 +225,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.xl,
+    // Ambient Card Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   chatInfo: {
     flex: 1,

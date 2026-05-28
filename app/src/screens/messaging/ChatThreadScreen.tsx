@@ -155,7 +155,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   };
 
   return (
-    <ScreenWrapper backgroundColor={colors.surfaceContainerLowest}>
+    <ScreenWrapper>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

@@ -9,10 +9,12 @@ interface SliderProps {
   value: number;
   onValueChange: (val: number) => void;
   label?: string;
+  activeColor?: string;
 }
 
-export default function Slider({ min, max, value, onValueChange, label }: SliderProps) {
+export default function Slider({ min, max, value, onValueChange, label, activeColor: activeColorProp }: SliderProps) {
   const { colors, typography } = useTheme();
+  const activeColor = activeColorProp || colors.primary;
   const [trackWidth, setTrackWidth] = useState(0);
 
   // Convert value to percentage string
@@ -105,14 +107,14 @@ export default function Slider({ min, max, value, onValueChange, label }: Slider
         {...bestPan.panHandlers}
       >
         <View style={[styles.trackInner, { backgroundColor: colors.outlineVariant + '40' }]} />
-        <View style={[styles.fill, { backgroundColor: colors.primary, width: percentStr }]} />
+        <View style={[styles.fill, { backgroundColor: activeColor, width: percentStr }]} />
         <View
           style={[
             styles.thumb,
             {
               left: percentStr,
               backgroundColor: colors.surfaceContainerLowest,
-              borderColor: colors.primary,
+              borderColor: activeColor,
             },
           ]}
         />

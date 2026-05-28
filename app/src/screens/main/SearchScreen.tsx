@@ -364,7 +364,16 @@ export default function SearchScreen({ navigation }: any) {
       </View>
 
       {/* ── Nearby players placeholder ── */}
-      <View style={[styles.mapPlaceholder, { backgroundColor: colors.surfaceContainerHigh }]}>
+      <View
+        style={[
+          styles.mapPlaceholder,
+          {
+            backgroundColor: colors.surfaceContainerHigh,
+            borderBottomWidth: 3,
+            borderBottomColor: colors.brandGreen,
+          },
+        ]}
+      >
         {/* Decorative grid lines mimicking a map */}
         <View style={styles.mapGrid}>
           {[0,1,2,3].map(i => (
@@ -404,12 +413,12 @@ export default function SearchScreen({ navigation }: any) {
 
           {/* "You" pin */}
           <View style={[styles.mapAvatarPin, { top: '48%', left: '48%' }]}>
-            <View style={[styles.mapAvatarRing, { borderColor: colors.tertiary }]}>
-              <View style={[styles.youDot, { backgroundColor: colors.tertiary }]} />
+            <View style={[styles.mapAvatarRing, { borderColor: colors.primary }]}>
+              <View style={[styles.youDot, { backgroundColor: colors.primary }]} />
             </View>
-            <View style={[styles.mapAvatarTail, { borderTopColor: colors.tertiary }]} />
-            <View style={[styles.mapNamePill, { backgroundColor: colors.tertiary }]}>
-              <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 9 }]}>You</Text>
+            <View style={[styles.mapAvatarTail, { borderTopColor: colors.primary }]} />
+            <View style={[styles.mapNamePill, { backgroundColor: colors.primary }]}>
+              <Text style={[typography.labelSmall, { color: colors.onPrimary, fontSize: 9 }]}>You</Text>
             </View>
           </View>
         </View>
@@ -442,7 +451,7 @@ export default function SearchScreen({ navigation }: any) {
         <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800' }]}>
           Suggested Matches
         </Text>
-        <View style={[styles.headingAccent, { backgroundColor: colors.tertiary }]} />
+        <View style={[styles.headingAccent, { backgroundColor: colors.brandGreen }]} />
       </View>
     </View>
   );

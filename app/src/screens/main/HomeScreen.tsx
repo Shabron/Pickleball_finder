@@ -126,7 +126,7 @@ export default function HomeScreen({ navigation }: any) {
 
 
   return (
-    <ScreenWrapper backgroundColor="#EAF4FC">
+    <ScreenWrapper>
       <Header
         showLogo
         showNotificationBell
@@ -141,7 +141,11 @@ export default function HomeScreen({ navigation }: any) {
       <View
         style={[
           styles.filterSection,
-          { backgroundColor: '#FFFFFF' },
+          {
+            backgroundColor: '#FFFFFF',
+            borderBottomWidth: 3,
+            borderBottomColor: colors.brandGreen,
+          },
         ]}
       >
         <Text
@@ -171,9 +175,12 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
           Partner Posts
         </Text>
-        <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
-          {posts.length} active posts
-        </Text>
+        <View style={[styles.activeBadge, { backgroundColor: colors.brandGreenContainer }]}>
+          <View style={[styles.activeDot, { backgroundColor: colors.brandGreen }]} />
+          <Text style={[typography.labelMedium, { color: colors.onBrandGreenContainer, fontWeight: '600' }]}>
+            {posts.length} active posts
+          </Text>
+        </View>
       </View>
 
       {loading ? (
@@ -233,6 +240,21 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  activeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
   },
   listContainer: {
     paddingHorizontal: spacing.md,
