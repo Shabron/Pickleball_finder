@@ -72,6 +72,16 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Allow overriding GOOGLE_MAPS_API_KEY (and other secrets) from the
+// gitignored local.properties file, so real keys never need to be
+// committed to the tracked gradle.properties.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def googleMapsApiKey = localProperties.getProperty('GOOGLE_MAPS_API_KEY') ?: project.findProperty("GOOGLE_MAPS_API_KEY") ?: ""
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -84,8 +94,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        // Inject Maps API key from gradle.properties → AndroidManifest.xml
-        manifestPlaceholders = [GOOGLE_MAPS_API_KEY: project.findProperty("GOOGLE_MAPS_API_KEY") ?: ""]
+        // Inject Maps API key (local.properties takes precedence over gradle.properties) → AndroidManifest.xml
+        manifestPlaceholders = [GOOGLE_MAPS_API_KEY: googleMapsApiKey]
     }
     signingConfigs {
         debug {

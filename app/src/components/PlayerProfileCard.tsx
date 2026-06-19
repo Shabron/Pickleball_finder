@@ -40,6 +40,8 @@ export interface PlayerProfileData {
   age?: number;
   connectionStatus?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
   conversationId?: string;
+  /** Approximate location, when known, for plotting on the nearby-players map */
+  coordinate?: { latitude: number; longitude: number };
 }
 
 interface PlayerProfileCardProps {

@@ -3,7 +3,7 @@
  *
  * Features:
  *  - App header with logo + "Senior Pickleball" branding
- *  - Nearby players section (map coming soon placeholder)
+ *  - Nearby players section with a live MapView of approximate locations
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
  *  - onEndReached appends more mock players (simulated pagination)
  */
@@ -16,19 +16,24 @@ import {
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import MapView from 'react-native-maps';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
+import PlayerMapMarker from '../../components/PlayerMapMarker';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
-import { SlidersHorizontal, MapPin, Navigation } from 'lucide-react-native';
+import { SlidersHorizontal, MapPin } from 'lucide-react-native';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// TODO: replace with the signed-in user's real (or profile-derived) location
+// once on-device location capture / profile geocoding is surfaced here too.
+const CURRENT_USER_LOCATION = { latitude: 27.9606, longitude: -82.4572 };
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
 
@@ -159,12 +164,14 @@ const MORE_PLAYERS: PlayerProfileData[] = [
 ];
 
 // ─── Nearby players preview (used in map placeholder) ────────────────────────
+// No real coordinate here — these are only a fallback for when the API
+// hasn't returned data yet, so they're never plotted on the map.
 
-const NEARBY_PREVIEW = [
-  { id: '1', name: 'Arthur S.', distance: '1.2 mi', avatarUri: 'https://randomuser.me/api/portraits/men/67.jpg' },
-  { id: '2', name: 'Betty L.', distance: '2.5 mi', avatarUri: 'https://randomuser.me/api/portraits/women/52.jpg' },
-  { id: '3', name: 'Clara M.', distance: '0.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/71.jpg' },
-  { id: '5', name: 'Eleanor R.', distance: '1.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/68.jpg' },
+const NEARBY_PREVIEW: PlayerProfileData[] = [
+  { id: '1', name: 'Arthur S.', level: '3.0', distance: '1.2 mi', avatarUri: 'https://randomuser.me/api/portraits/men/67.jpg' },
+  { id: '2', name: 'Betty L.', level: '3.5', distance: '2.5 mi', avatarUri: 'https://randomuser.me/api/portraits/women/52.jpg' },
+  { id: '3', name: 'Clara M.', level: '2.5', distance: '0.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/71.jpg' },
+  { id: '5', name: 'Eleanor R.', level: '3.0', distance: '1.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/68.jpg' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -199,27 +206,37 @@ export default function SearchScreen({ navigation }: any) {
     try {
       setLoading(true);
       const res = await matchmakingApi.getNearbyPlayers({
-        lat: 27.9606,
-        lng: -82.4572,
+        lat: CURRENT_USER_LOCATION.latitude,
+        lng: CURRENT_USER_LOCATION.longitude,
         radiusKm: 20,
         limit: 25,
       });
 
       if (res.success && res.data) {
-        const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => ({
-          id: p.user?._id || p._id,
-          name: p.user?.name || 'Unknown',
-          level: p.skillLevel || 'N/A',
-          distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
-          avatarUri: p.user?.avatar || undefined,
-          matchScore: Math.floor(Math.random() * 40) + 60,
-          playStyle: p.playStyle || 'Any',
-          bio: p.bio || '',
-          isOnline: Math.random() > 0.5,
-          age: p.age || undefined,
-          connectionStatus: p.connectionStatus || 'none',
-          conversationId: p.conversationId,
-        }));
+        const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => {
+          // GeoJSON stores coordinates as [longitude, latitude]
+          const coords = p.location?.coordinates;
+          const coordinate =
+            Array.isArray(coords) && coords.length === 2
+              ? { latitude: coords[1], longitude: coords[0] }
+              : undefined;
+
+          return {
+            id: p.user?._id || p._id,
+            name: p.user?.name || 'Unknown',
+            level: p.skillLevel || 'N/A',
+            distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
+            avatarUri: p.user?.avatar || undefined,
+            matchScore: Math.floor(Math.random() * 40) + 60,
+            playStyle: p.playStyle || 'Any',
+            bio: p.bio || '',
+            isOnline: Math.random() > 0.5,
+            age: p.age || undefined,
+            connectionStatus: p.connectionStatus || 'none',
+            conversationId: p.conversationId,
+            coordinate,
+          };
+        });
         setAllPlayers(mappedPlayers);
       } else {
         setAllPlayers([]);
@@ -363,7 +380,7 @@ export default function SearchScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Nearby players placeholder ── */}
+      {/* ── Nearby players map ── */}
       <View
         style={[
           styles.mapPlaceholder,
@@ -374,54 +391,37 @@ export default function SearchScreen({ navigation }: any) {
           },
         ]}
       >
-        {/* Decorative grid lines mimicking a map */}
-        <View style={styles.mapGrid}>
-          {[0,1,2,3].map(i => (
-            <View key={`h${i}`} style={[styles.gridLineH, { backgroundColor: colors.outline + '40', top: `${25 * (i + 1)}%` as any }]} />
-          ))}
-          {[0,1,2,3].map(i => (
-            <View key={`v${i}`} style={[styles.gridLineV, { backgroundColor: colors.outline + '40', left: `${25 * (i + 1)}%` as any }]} />
-          ))}
-
-          {/* Decorative road lines */}
-          <View style={[styles.roadH, { backgroundColor: colors.outline + '60', top: '50%' }]} />
-          <View style={[styles.roadV, { backgroundColor: colors.outline + '60', left: '50%' }]} />
-
-          {/* Player avatar pins positioned on the "map" */}
-          {nearbyPreview.map((p, idx) => {
-            const positions = [
-              { top: '18%', left: '65%' },
-              { top: '60%', left: '22%' },
-              { top: '30%', left: '38%' },
-              { top: '65%', left: '72%' },
-            ];
-            const pos = positions[idx] || { top: '50%', left: '50%' };
-            return (
-              <View key={p.id} style={[styles.mapAvatarPin, pos as any]}>
-                <View style={[styles.mapAvatarRing, { borderColor: colors.primary }]}>
-                  <Image source={{ uri: p.avatarUri }} style={styles.mapAvatarImg} />
-                </View>
-                <View style={[styles.mapAvatarTail, { borderTopColor: colors.primary }]} />
-                <View style={[styles.mapNamePill, { backgroundColor: colors.surfaceContainerLowest }]}>
-                  <Text style={[typography.labelSmall, { color: colors.onSurface, fontSize: 9 }]}>
-                    {p.name.split(' ')[0]}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-
+        <MapView
+          style={styles.map}
+          initialRegion={{
+            ...CURRENT_USER_LOCATION,
+            latitudeDelta: 0.15,
+            longitudeDelta: 0.15,
+          }}
+        >
           {/* "You" pin */}
-          <View style={[styles.mapAvatarPin, { top: '48%', left: '48%' }]}>
-            <View style={[styles.mapAvatarRing, { borderColor: colors.primary }]}>
-              <View style={[styles.youDot, { backgroundColor: colors.primary }]} />
-            </View>
-            <View style={[styles.mapAvatarTail, { borderTopColor: colors.primary }]} />
-            <View style={[styles.mapNamePill, { backgroundColor: colors.primary }]}>
-              <Text style={[typography.labelSmall, { color: colors.onPrimary, fontSize: 9 }]}>You</Text>
-            </View>
-          </View>
-        </View>
+          <PlayerMapMarker
+            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: CURRENT_USER_LOCATION, isCurrentUser: true }}
+          />
+
+          {/* Player pins — only players with a known (approximate) location */}
+          {nearbyPreview
+            .filter(p => p.coordinate)
+            .map(p => (
+              <PlayerMapMarker
+                key={p.id}
+                player={{
+                  id: p.id,
+                  name: p.name,
+                  level: p.level || '',
+                  distance: p.distance,
+                  coordinate: p.coordinate!,
+                  avatarUri: p.avatarUri,
+                }}
+                onPress={() => navigation.navigate('UserProfile', { userId: p.id })}
+              />
+            ))}
+        </MapView>
 
         {/* LIVE badge */}
         <View style={[styles.liveBadge, { backgroundColor: colors.surfaceContainerLowest }]}>
@@ -434,14 +434,6 @@ export default function SearchScreen({ navigation }: any) {
           <MapPin size={12} color={colors.onPrimary} />
           <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700', marginLeft: 4 }]}>
             {nearbyPreview.length} players nearby
-          </Text>
-        </View>
-
-        {/* Coming soon overlay */}
-        <View style={[styles.comingSoonBadge, { backgroundColor: colors.surfaceContainerLowest + 'EE' }]}>
-          <Navigation size={14} color={colors.primary} />
-          <Text style={[typography.labelSmall, { color: colors.primary, fontWeight: '700', marginLeft: 5 }]}>
-            Map view coming soon
           </Text>
         </View>
       </View>
@@ -535,7 +527,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
   },
-  // ── Map placeholder ──────────────────────────────────────────────────
+  // ── Map ──────────────────────────────────────────────────────────────
   mapPlaceholder: {
     height: SCREEN_HEIGHT * 0.34,
     marginHorizontal: spacing.lg,
@@ -544,81 +536,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     position: 'relative',
   },
-  mapGrid: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  gridLineH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-  },
-  gridLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-  },
-  roadH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 3,
-    marginTop: -1.5,
-  },
-  roadV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 3,
-    marginLeft: -1.5,
-  },
-  mapAvatarPin: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -18 }, { translateY: -18 }],
-  },
-  mapAvatarRing: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    padding: 2,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapAvatarImg: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  youDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  mapAvatarTail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -1,
-  },
-  mapNamePill: {
-    marginTop: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
+  map: {
+    flex: 1,
   },
   liveBadge: {
     position: 'absolute',
@@ -657,16 +576,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
-  },
-  comingSoonBadge: {
-    position: 'absolute',
-    bottom: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
   },
   matchesHeading: {
     marginHorizontal: spacing.lg,

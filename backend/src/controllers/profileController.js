@@ -2,6 +2,7 @@ const Profile = require('../models/Profile');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Notification = require('../models/Notification');
+const { geocodeApprox } = require('../utils/geocode');
 
 // @desc    Get my profile
 // @route   GET /api/profile/me
@@ -54,6 +55,13 @@ const updateMyProfile = async (req, res) => {
       }
 
       location = { type: 'Point', coordinates: [lngNum, latNum] };
+    } else if (zipCode || (city && state)) {
+      // No precise GPS coordinates supplied — fall back to an approximate
+      // point derived from the zip/city/state the user already entered.
+      const approx = geocodeApprox({ zipCode, city, state });
+      if (approx) {
+        location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+      }
     }
 
     const profileFields = {
