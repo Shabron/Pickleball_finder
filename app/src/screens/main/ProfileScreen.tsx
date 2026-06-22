@@ -5,12 +5,12 @@
  * Links to Edit Profile, About, Notifications, Settings, Logout.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
 import { profileApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield } from 'lucide-react-native';
+import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield, FileText } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
@@ -91,7 +91,17 @@ export default function ProfileScreen({ navigation }: any) {
       onPress: () => navigation.navigate('NotificationSettings'),
     },
     {
-      icon: <Info size={sizes.iconSmall} color={colors.secondary} />,
+      icon: <Shield size={sizes.iconSmall} color={colors.primary} />,
+      label: 'Privacy Policy',
+      onPress: () => navigation.navigate('PrivacyPolicy'),
+    },
+    {
+      icon: <FileText size={sizes.iconSmall} color={colors.secondary} />,
+      label: 'Terms & Conditions',
+      onPress: () => navigation.navigate('Terms'),
+    },
+    {
+      icon: <Info size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
       label: 'About the App',
       onPress: () => navigation.navigate('About'),
     },

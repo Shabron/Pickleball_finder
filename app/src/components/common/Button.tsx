@@ -71,6 +71,9 @@ export default function Button({
 
   const config = variantConfig[variant];
 
+  const flattenedStyle = StyleSheet.flatten(style);
+  const flattenedTextStyle = StyleSheet.flatten(textStyle);
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -79,11 +82,16 @@ export default function Button({
       style={[
         styles.container,
         {
-          backgroundColor: disabled ? colors.surfaceContainerHighest : config.bg,
-          borderColor: disabled ? colors.outlineVariant : config.border,
+          backgroundColor: config.bg,
+          borderColor: config.border,
           borderWidth: variant === 'outline' ? 1.5 : 0,
         },
-        style,
+        flattenedStyle,
+        disabled && {
+          backgroundColor: colors.surfaceContainerHigh,
+          borderColor: colors.transparent,
+          borderWidth: 0,
+        },
       ]}
     >
       {loading ? (
@@ -96,10 +104,13 @@ export default function Button({
               typography.titleSmall,
               styles.text,
               {
-                color: disabled ? colors.outlineVariant : config.text,
+                color: config.text,
                 marginLeft: icon ? 8 : 0,
               },
-              textStyle,
+              flattenedTextStyle,
+              disabled && {
+                color: colors.onSurfaceVariant,
+              },
             ]}
           >
             {title}

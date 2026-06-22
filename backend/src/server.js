@@ -32,6 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/public', express.static(path.join(__dirname, '../public')));
 
 // Request Logger
 app.use((req, res, next) => {

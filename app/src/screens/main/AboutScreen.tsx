@@ -89,9 +89,9 @@ export default function AboutScreen({ navigation }: any) {
           <Text style={[typography.bodyLarge, { color: colors.onPrimaryContainer, lineHeight: 26 }]}>
             Hi! I'm a junior in high school from New Jersey, personally inspired by my grandmother to build this app. I wanted it as a means to show support for those who once cared for us.{'\n\n'}
             I am consistently striving to promote both mental and physical fitness in seniors through volunteering efforts within my local community, and I'd love to scale this app nationally.{'\n\n'}
-            💛 First-year subscription proceeds will be donated to{' '}
-            <Text style={{ fontWeight: '700' }}>North Jersey Villages</Text>
-            {' '}— a nonprofit committed to helping seniors age-in-place that I currently volunteer for.
+            {/*💛 First-year subscription proceeds will be donated to{' '}*/}
+            {/*<Text style={{ fontWeight: '700' }}>North Jersey Villages</Text>*/}
+            {/*{' '}— a nonprofit committed to helping seniors age-in-place that I currently volunteer for.*/}
           </Text>
         </View>
 

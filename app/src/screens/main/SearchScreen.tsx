@@ -205,12 +205,15 @@ export default function SearchScreen({ navigation }: any) {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
+      console.log('SearchScreen: Fetching players for location:', CURRENT_USER_LOCATION);
       const res = await matchmakingApi.getNearbyPlayers({
         lat: CURRENT_USER_LOCATION.latitude,
         lng: CURRENT_USER_LOCATION.longitude,
         radiusKm: 20,
         limit: 25,
       });
+      console.log('SearchScreen: API response success status:', res?.success);
+      console.log('SearchScreen: API response data length:', res?.data?.length);
 
       if (res.success && res.data) {
         const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => {
@@ -220,6 +223,8 @@ export default function SearchScreen({ navigation }: any) {
             Array.isArray(coords) && coords.length === 2
               ? { latitude: coords[1], longitude: coords[0] }
               : undefined;
+
+          console.log(`SearchScreen: Player ${p.user?.name || p._id} coordinate:`, coordinate);
 
           return {
             id: p.user?._id || p._id,
@@ -237,12 +242,14 @@ export default function SearchScreen({ navigation }: any) {
             coordinate,
           };
         });
+        console.log('SearchScreen: Total mapped players:', mappedPlayers.length);
         setAllPlayers(mappedPlayers);
       } else {
+        console.log('SearchScreen: API success is false or no data returned');
         setAllPlayers([]);
       }
     } catch (error) {
-      console.error('Failed to fetch players:', error);
+      console.error('SearchScreen: Failed to fetch players error:', error);
       setAllPlayers([]);
     } finally {
       setLoading(false);
@@ -380,7 +387,8 @@ export default function SearchScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Nearby players map ── */}
+      {/* ── Nearby players map (Disabled for now) ── */}
+      {false && (
       <View
         style={[
           styles.mapPlaceholder,
@@ -437,6 +445,7 @@ export default function SearchScreen({ navigation }: any) {
           </Text>
         </View>
       </View>
+      )}
 
       {/* ── Matches heading ── */}
       <View style={styles.matchesHeading}>

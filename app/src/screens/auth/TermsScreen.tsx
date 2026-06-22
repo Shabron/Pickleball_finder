@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Image,
+  Linking,
 } from 'react-native';
 import { Check, ShieldAlert, ShieldCheck, UserCheck, Eye, ArrowRight, X } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -15,6 +16,7 @@ import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '@env';
 
 export default function TermsScreen({ route, navigation }: any) {
   const { token, userData } = route.params || {};
@@ -114,41 +116,61 @@ export default function TermsScreen({ route, navigation }: any) {
             </ScrollView>
 
             {/* Checkbox Section */}
-            <TouchableOpacity 
-              style={styles.checkboxContainer} 
-              onPress={() => setAccepted(!accepted)}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  { borderColor: accepted ? colors.primary : '#D1D5DB' },
-                  accepted && { backgroundColor: colors.primary }
-                ]}
+            {token && userData && (
+              <TouchableOpacity 
+                style={styles.checkboxContainer} 
+                onPress={() => setAccepted(!accepted)}
+                activeOpacity={0.8}
               >
-                {accepted && <Check color="white" size={14} />}
-              </View>
-              <Text style={[typography.bodyMedium, styles.checkboxLabel]}>
-                I agree to the Community Guidelines, Terms of Service, and Privacy Policy.
-              </Text>
-            </TouchableOpacity>
+                <View
+                  style={[
+                    styles.checkbox,
+                    { borderColor: accepted ? colors.primary : '#D1D5DB' },
+                    accepted && { backgroundColor: colors.primary }
+                  ]}
+                >
+                  {accepted && <Check color="white" size={14} />}
+                </View>
+                <Text style={[typography.bodyMedium, styles.checkboxLabel]}>
+                  I agree to the Community Guidelines, Terms of Service, and{' '}
+                  <Text 
+                    style={[styles.linkText, { color: colors.primary }]}
+                    onPress={() => navigation.navigate('PrivacyPolicy')}
+                  >
+                    Privacy Policy
+                  </Text>
+                  .
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Action Buttons */}
             <View style={styles.buttonContainer}>
-              <Button
-                title="CANCEL"
-                onPress={handleCancel}
-                variant="outline"
-                style={styles.cancelButton}
-                textStyle={{ fontWeight: 'bold' }}
-              />
-              <Button
-                title="ACCEPT & JOIN"
-                onPress={handleAccept}
-                disabled={!accepted}
-                style={styles.acceptButton}
-                textStyle={{ fontWeight: 'bold' }}
-              />
+              {token && userData ? (
+                <>
+                  <Button
+                    title="CANCEL"
+                    onPress={handleCancel}
+                    variant="outline"
+                    style={styles.cancelButton}
+                    textStyle={{ fontWeight: 'bold' }}
+                  />
+                  <Button
+                    title="ACCEPT & JOIN"
+                    onPress={handleAccept}
+                    disabled={!accepted}
+                    style={styles.acceptButton}
+                    textStyle={{ fontWeight: 'bold' }}
+                  />
+                </>
+              ) : (
+                <Button
+                  title="CLOSE"
+                  onPress={handleCancel}
+                  style={{ flex: 1 }}
+                  textStyle={{ fontWeight: 'bold' }}
+                />
+              )}
             </View>
           </Card>
         </View>
@@ -239,6 +261,10 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
     lineHeight: 18,
+  },
+  linkText: {
+    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
   buttonContainer: {
     flexDirection: 'row',

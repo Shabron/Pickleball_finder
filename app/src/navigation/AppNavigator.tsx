@@ -19,6 +19,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import TermsScreen from '../screens/auth/TermsScreen';
+import PrivacyPolicyScreen from '../screens/auth/PrivacyPolicyScreen';
 
 // Onboarding / Profile
 import CreateProfileScreen from '../screens/profile/CreateProfileScreen';
@@ -68,6 +69,7 @@ export default function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
           <Stack.Screen name="Terms" component={TermsScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -95,6 +97,8 @@ export default function AppNavigator() {
           <Stack.Screen name="About" component={AboutScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
+          <Stack.Screen name="Terms" component={TermsScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       )}
     </NavigationContainer>

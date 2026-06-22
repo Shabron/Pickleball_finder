@@ -20,6 +20,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { Mail, Lock, ArrowRight } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -29,6 +30,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '@env';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -144,9 +146,21 @@ export default function LoginScreen({ navigation }: any) {
             />
 
             {/* ─── Footer ─── */}
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Senior Support</Text>
-            </TouchableOpacity>
+            <View style={styles.footerLinksContainer}>
+              <TouchableOpacity 
+                style={styles.footerLink}
+                onPress={() => Linking.openURL('mailto:shauryamspp@gmail.com').catch(err => console.error(err))}
+              >
+                <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Support</Text>
+              </TouchableOpacity>
+              <Text style={[styles.footerDivider, { color: colors.onSurfaceVariant || '#6B7280' }]}>|</Text>
+              <TouchableOpacity 
+                style={styles.footerLink}
+                onPress={() => navigation.navigate('PrivacyPolicy')}
+              >
+                <Text style={[styles.supportText, { color: colors.brandGreen }]}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -235,9 +249,18 @@ const styles = StyleSheet.create({
     height: 52,
     marginTop: spacing.xs,
   },
-  footerLink: {
+  footerLinksContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: spacing.lg,
+    gap: spacing.md,
+  },
+  footerDivider: {
+    fontSize: 15,
+  },
+  footerLink: {
+    alignItems: 'center',
   },
   supportText: {
     textDecorationLine: 'underline',

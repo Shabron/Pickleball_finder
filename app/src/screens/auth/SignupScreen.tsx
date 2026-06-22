@@ -18,8 +18,9 @@ import {
   Platform,
   Image,
   Alert,
+  Linking,
 } from 'react-native';
-import { Mail, Lock, User, Phone, ArrowRight } from 'lucide-react-native';
+import { Mail, Lock, User, Phone, ArrowRight, Check } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
@@ -28,6 +29,7 @@ import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { authApi, setToken } from '../../services/api';
+import { API_BASE_URL } from '@env';
 
 
 
@@ -39,6 +41,7 @@ export default function SignupScreen({ navigation }: any) {
     password: '',
     confirmPassword: '',
   });
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
 
@@ -50,7 +53,8 @@ export default function SignupScreen({ navigation }: any) {
     formData.name.trim() &&
     formData.email.trim() &&
     formData.password.trim() &&
-    formData.password === formData.confirmPassword;
+    formData.password === formData.confirmPassword &&
+    acceptedPrivacy;
 
   const handleSignup = async () => {
     if (!isValid) return;
@@ -159,6 +163,32 @@ export default function SignupScreen({ navigation }: any) {
 
 
 
+            {/* Checkbox Section */}
+            <TouchableOpacity 
+              style={styles.checkboxContainer} 
+              onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  { borderColor: acceptedPrivacy ? colors.primary : '#D1D5DB' },
+                  acceptedPrivacy && { backgroundColor: colors.primary }
+                ]}
+              >
+                {acceptedPrivacy && <Check color="white" size={14} />}
+              </View>
+              <Text style={[typography.bodyMedium, styles.checkboxLabel]}>
+                I agree to the{' '}
+                <Text 
+                  style={[styles.linkText, { color: colors.primary }]}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                >
+                  Privacy Policy
+                </Text>
+              </Text>
+            </TouchableOpacity>
+
             {/* ─── Submit ─── */}
             <Button
               title="JOIN THE COMMUNITY"
@@ -248,7 +278,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     height: 52,
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
   footerLink: {
     alignItems: 'center',
@@ -258,5 +288,31 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     color: '#111827',
     fontSize: 15,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    marginRight: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxLabel: {
+    flex: 1,
+    color: '#374151',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  linkText: {
+    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
 });
