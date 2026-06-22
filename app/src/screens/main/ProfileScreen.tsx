@@ -5,12 +5,12 @@
  * Links to Edit Profile, About, Notifications, Settings, Logout.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
-import { profileApi } from '../../services/api';
+import { profileApi, authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield, FileText } from 'lucide-react-native';
+import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield, FileText, Trash2 } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
@@ -22,7 +22,7 @@ import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 export default function ProfileScreen({ navigation }: any) {
   const { colors, typography, toggleTheme, isDark } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -71,6 +71,32 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (error) {
       console.error('Failed to logout', error);
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account and all associated user data? This action is immediate and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'DELETE', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await authApi.deleteAccount();
+              await logout();
+              Alert.alert('Success', 'Your account and data have been successfully deleted.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete account');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const menuItems = [
@@ -129,7 +155,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Card elevation={2} padding={spacing.xxl}>
             <View style={styles.profileHeaderContent}>
               <Avatar
-                name={profileData?.user?.name || 'User'}
+                name={profileData?.user?.name || user?.name || 'User'}
                 uri={profileData?.avatar ? `${API_BASE_URL.replace(/\/api$/, '')}${profileData.avatar}` : undefined}
                 size={sizes.avatarLarge}
               />
@@ -137,12 +163,12 @@ export default function ProfileScreen({ navigation }: any) {
               <Text
                 style={[typography.headlineSmall, { color: colors.onSurface, marginTop: spacing.md }]}
               >
-                {profileData?.user?.name || 'Unknown User'}
+                {profileData?.user?.name || user?.name || 'Unknown User'}
               </Text>
               <Text
                 style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}
               >
-                {profileData?.user?.email || ''}
+                {profileData?.user?.email || user?.email || ''}
               </Text>
 
               <View style={styles.badgeRow}>
@@ -226,14 +252,23 @@ export default function ProfileScreen({ navigation }: any) {
           ))}
         </View>
 
-        {/* ─── Logout ─── */}
-        <Button
-          title="LOGOUT"
-          onPress={handleLogout}
-          variant="error"
-          style={{ marginTop: spacing.lg }}
-          icon={<LogOut color={colors.onError} size={18} />}
-        />
+        {/* ─── Account Actions ─── */}
+        <View style={styles.actionButtonsContainer}>
+          <Button
+            title="LOGOUT"
+            onPress={handleLogout}
+            variant="outline"
+            style={{ flex: 1 }}
+            icon={<LogOut color={colors.primary} size={18} />}
+          />
+          <Button
+            title="DELETE"
+            onPress={handleDeleteAccount}
+            variant="error"
+            style={{ flex: 1 }}
+            icon={<Trash2 color={colors.onError} size={18} />}
+          />
+        </View>
 
         {/* Version */}
         <Text
@@ -301,5 +336,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 5,
     marginRight: spacing.sm,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
 });

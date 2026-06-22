@@ -20,6 +20,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Mail, Lock, User, Phone, ArrowRight, Check } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Input from '../../components/common/Input';
@@ -65,6 +66,8 @@ export default function SignupScreen({ navigation }: any) {
       const userData = response.data;
 
       if (token && userData) {
+        // Keep in local memory as requested
+        await AsyncStorage.setItem('@pending_terms', JSON.stringify({ token, userData }));
         // Navigate to the Terms acceptance screen instead of logging in directly
         navigation.navigate('Terms', { token, userData });
       }

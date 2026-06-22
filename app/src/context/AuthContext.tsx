@@ -15,6 +15,7 @@
  *   - logout()       : clears token + resets state
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, setToken, clearToken } from '../services/api';
 
 interface User {
@@ -29,10 +30,12 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   user: User | null;
   isNewSignup: boolean;
+  pendingTerms: { token: string; userData: User } | null;
   login: (token: string, user: User, isSignup?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (fields: Partial<User>) => void;
   clearNewSignup: () => void;
+  clearPendingTerms: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -40,10 +43,12 @@ const AuthContext = createContext<AuthContextValue>({
   isAuthenticated: false,
   user: null,
   isNewSignup: false,
+  pendingTerms: null,
   login: async () => {},
   logout: async () => {},
   updateUser: () => {},
   clearNewSignup: () => {},
+  clearPendingTerms: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -51,11 +56,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isNewSignup, setIsNewSignup] = useState(false);
+  const [pendingTerms, setPendingTerms] = useState<{ token: string; userData: User } | null>(null);
 
   // Bootstrap — runs once on app launch
   useEffect(() => {
     const bootstrap = async () => {
       try {
+        // Check if there is a pending terms acceptance session in local storage first
+        const pending = await AsyncStorage.getItem('@pending_terms');
+        if (pending) {
+          const parsed = JSON.parse(pending);
+          setPendingTerms(parsed);
+          setIsLoading(false);
+          return;
+        }
+
         // Attempt to validate the stored token by calling /auth/me
         const res = await authApi.getMe();
         if (res.success && res.data) {
@@ -76,6 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = useCallback(async (token: string, userData: User, isSignup: boolean = false) => {
+    await AsyncStorage.removeItem('@pending_terms');
+    setPendingTerms(null);
     await setToken(token);
     setUser(userData);
     setIsNewSignup(isSignup);
@@ -83,6 +100,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async () => {
+    await AsyncStorage.removeItem('@pending_terms');
+    setPendingTerms(null);
     await clearToken();
     setUser(null);
     setIsNewSignup(false);
@@ -97,8 +116,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsNewSignup(false);
   }, []);
 
+  const clearPendingTerms = useCallback(async () => {
+    await AsyncStorage.removeItem('@pending_terms');
+    setPendingTerms(null);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ isLoading, isAuthenticated, user, isNewSignup, login, logout, updateUser, clearNewSignup }}>
+    <AuthContext.Provider value={{ isLoading, isAuthenticated, user, isNewSignup, pendingTerms, login, logout, updateUser, clearNewSignup, clearPendingTerms }}>
       {children}
     </AuthContext.Provider>
   );

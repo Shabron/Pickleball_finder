@@ -2,6 +2,11 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Profile = require('../models/Profile');
+const Post = require('../models/Post');
+const Reply = require('../models/Reply');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const Notification = require('../models/Notification');
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -220,4 +225,51 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, forgotPassword, resetPassword, getMe };
+// @desc    Delete current logged in user and all their data
+// @route   DELETE /api/auth/delete
+// @access  Private
+const deleteMe = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // 1. Delete user's Profile
+    await Profile.findOneAndDelete({ user: userId });
+
+    // 2. Delete user's Replies
+    await Reply.deleteMany({ author: userId });
+
+    // 3. Delete user's Posts
+    const userPosts = await Post.find({ author: userId });
+    const postIds = userPosts.map(post => post._id);
+    if (postIds.length > 0) {
+      await Reply.deleteMany({ post: { $in: postIds } });
+      await Post.deleteMany({ _id: { $in: postIds } });
+    }
+
+    // 4. Delete user's messages
+    await Message.deleteMany({ senderId: userId });
+
+    // 5. Delete user's Conversations
+    const userConvs = await Conversation.find({ participants: userId });
+    const convIds = userConvs.map(c => c._id);
+    if (convIds.length > 0) {
+      await Message.deleteMany({ conversationId: { $in: convIds } });
+      await Conversation.deleteMany({ _id: { $in: convIds } });
+    }
+
+    // 6. Delete user's Notifications
+    await Notification.deleteMany({ recipient: userId });
+
+    // 7. Delete User
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Account and all associated user data deleted successfully.',
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { signup, login, forgotPassword, resetPassword, getMe, deleteMe };

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { signup, login, forgotPassword, resetPassword, getMe } = require('../controllers/authController');
+const { signup, login, forgotPassword, resetPassword, getMe, deleteMe } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 // POST /api/auth/signup
@@ -17,5 +17,8 @@ router.post('/forgot-password', forgotPassword);
 
 // POST /api/auth/reset-password/:token
 router.post('/reset-password/:token', resetPassword);
+
+// DELETE /api/auth/delete — delete account and data
+router.delete('/delete', protect, deleteMe);
 
 module.exports = router;

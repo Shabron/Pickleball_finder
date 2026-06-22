@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Image,
   Linking,
+  Alert,
 } from 'react-native';
 import { Check, ShieldAlert, ShieldCheck, UserCheck, Eye, ArrowRight, X } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -21,11 +22,18 @@ import { API_BASE_URL } from '@env';
 export default function TermsScreen({ route, navigation }: any) {
   const { token, userData } = route.params || {};
   const { colors, typography } = useTheme();
-  const { login } = useAuth();
+  const { login, clearPendingTerms } = useAuth();
   const [accepted, setAccepted] = useState(false);
 
   const handleAccept = async () => {
-    if (!accepted || !token || !userData) return;
+    if (!accepted) {
+      Alert.alert('Error', 'Please agree to the Community Guidelines, Terms of Service, and Privacy Policy.');
+      return;
+    }
+    if (!token || !userData) {
+      Alert.alert('Error', 'Registration session expired or invalid. Please try signing up again.');
+      return;
+    }
     try {
       await login(token, {
         _id: userData._id,
@@ -33,13 +41,22 @@ export default function TermsScreen({ route, navigation }: any) {
         email: userData.email,
         profileComplete: userData.profileComplete,
       }, true);
-    } catch (error) {
+    } catch (error: any) {
+      Alert.alert('Login Failed', error.message || 'Failed to login after accepting terms');
       console.error('Failed to login after accepting terms', error);
     }
   };
 
-  const handleCancel = () => {
-    navigation.goBack();
+  const handleCancel = async () => {
+    try {
+      await clearPendingTerms();
+    } catch (error) {
+      console.error(error);
+    }
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Welcome' }],
+    });
   };
 
   return (

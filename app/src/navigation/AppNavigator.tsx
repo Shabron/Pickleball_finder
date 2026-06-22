@@ -53,7 +53,7 @@ function SplashScreen() {
 }
 
 export default function AppNavigator() {
-  const { isLoading, isAuthenticated, isNewSignup } = useAuth();
+  const { isLoading, isAuthenticated, isNewSignup, pendingTerms } = useAuth();
 
   return (
     <NavigationContainer>
@@ -63,12 +63,19 @@ export default function AppNavigator() {
           <Stack.Screen name="Splash" component={SplashScreen} />
         </Stack.Navigator>
       ) : !isAuthenticated ? (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator 
+          initialRouteName={pendingTerms ? "Terms" : "Welcome"}
+          screenOptions={{ headerShown: false }}
+        >
           {/* Guest screens (shown when NOT authenticated) */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
-          <Stack.Screen name="Terms" component={TermsScreen} />
+          <Stack.Screen 
+            name="Terms" 
+            component={TermsScreen} 
+            initialParams={pendingTerms ? { token: pendingTerms.token, userData: pendingTerms.userData } : undefined}
+          />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       ) : (

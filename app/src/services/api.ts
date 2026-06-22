@@ -80,6 +80,26 @@ export const authApi = {
 
     return await response.json();
   },
+
+  deleteAccount: async () => {
+    const token = await getToken();
+    if (!token) throw new Error('No token stored');
+
+    const response = await fetch(`${API_BASE_URL}/auth/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete account');
+    }
+
+    return await response.json();
+  },
 };
 
 export const profileApi = {
