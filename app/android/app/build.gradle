@@ -81,6 +81,10 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 def googleMapsApiKey = localProperties.getProperty('GOOGLE_MAPS_API_KEY') ?: project.findProperty("GOOGLE_MAPS_API_KEY") ?: ""
+def releaseStoreFile = localProperties.getProperty('RELEASE_STORE_FILE') ?: ""
+def releaseKeyAlias = localProperties.getProperty('RELEASE_KEY_ALIAS') ?: ""
+def releaseStorePassword = localProperties.getProperty('RELEASE_STORE_PASSWORD') ?: ""
+def releaseKeyPassword = localProperties.getProperty('RELEASE_KEY_PASSWORD') ?: ""
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -93,7 +97,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         // Inject Maps API key (local.properties takes precedence over gradle.properties) → AndroidManifest.xml
         manifestPlaceholders = [GOOGLE_MAPS_API_KEY: googleMapsApiKey]
     }
@@ -104,15 +108,19 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(releaseStoreFile)
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
