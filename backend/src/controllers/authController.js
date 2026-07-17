@@ -123,30 +123,38 @@ const login = async (req, res) => {
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log(`[forgotPassword] Request received for email: ${email}`);
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Please provide an email' });
     }
 
     const user = await User.findOne({ email });
+    console.log(`[forgotPassword] User lookup for ${email} → ${user ? 'found' : 'not found'}`);
 
     // Only generate/send a code if the account exists, but always return the
     // same generic response so requests can't be used to discover which
     // emails are registered.
     if (user) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[forgotPassword] Generated code for ${email}: ${code} (logged only outside production)`);
+      }
 
       user.resetPasswordToken = crypto.createHash('sha256').update(code).digest('hex');
       user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
       await user.save({ validateBeforeSave: false });
+      console.log(`[forgotPassword] Reset code stored for ${email}, expires in 10 minutes`);
 
       try {
+        console.log(`[forgotPassword] Attempting to send reset email to ${email}...`);
         await sendPasswordResetEmail(user.email, code);
+        console.log(`[forgotPassword] Reset email sent successfully to ${email}`);
       } catch (emailError) {
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
         await user.save({ validateBeforeSave: false });
-        console.error('Failed to send password reset email:', emailError.message);
+        console.error(`[forgotPassword] Failed to send reset email to ${email}:`, emailError);
         return res.status(500).json({ success: false, message: 'Failed to send reset email. Please try again later.' });
       }
     }

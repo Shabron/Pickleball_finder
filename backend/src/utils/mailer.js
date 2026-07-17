@@ -5,23 +5,40 @@ let transporter;
 const getTransporter = () => {
   if (transporter) return transporter;
 
-  transporter = process.env.EMAIL_SERVICE
-    ? nodemailer.createTransport({
+  const config = process.env.EMAIL_SERVICE
+    ? {
         service: process.env.EMAIL_SERVICE,
         auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      })
-    : nodemailer.createTransport({
+      }
+    : {
         host: process.env.EMAIL_HOST,
         port: Number(process.env.EMAIL_PORT) || 587,
         secure: Number(process.env.EMAIL_PORT) === 465,
         auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      });
+      };
+
+  console.log('[mailer] Creating SMTP transporter with config:', {
+    ...config,
+    auth: { user: config.auth.user, pass: config.auth.pass ? '(set)' : '(missing)' },
+  });
+
+  transporter = nodemailer.createTransport(config);
+
+  transporter.verify((error) => {
+    if (error) {
+      console.error('[mailer] SMTP connection verification FAILED:', error);
+    } else {
+      console.log('[mailer] SMTP connection verified — ready to send emails');
+    }
+  });
 
   return transporter;
 };
 
 const sendPasswordResetEmail = async (to, code) => {
-  await getTransporter().sendMail({
+  console.log(`[mailer] Sending password reset email to ${to} from ${process.env.EMAIL_FROM || process.env.EMAIL_USER}`);
+
+  const info = await getTransporter().sendMail({
     from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to,
     subject: 'Your Pickleball Finder password reset code',
@@ -35,6 +52,9 @@ const sendPasswordResetEmail = async (to, code) => {
       </div>
     `,
   });
+
+  console.log(`[mailer] Email accepted by SMTP server — messageId: ${info.messageId}, response: ${info.response}`);
+  return info;
 };
 
 module.exports = { sendPasswordResetEmail };
