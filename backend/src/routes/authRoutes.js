@@ -15,8 +15,8 @@ router.get('/me', protect, getMe);
 // POST /api/auth/forgot-password
 router.post('/forgot-password', forgotPassword);
 
-// POST /api/auth/reset-password/:token
-router.post('/reset-password/:token', resetPassword);
+// POST /api/auth/reset-password
+router.post('/reset-password', resetPassword);
 
 // DELETE /api/auth/delete — delete account and data
 router.delete('/delete', protect, deleteMe);

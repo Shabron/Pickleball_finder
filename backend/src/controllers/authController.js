@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sendPasswordResetEmail } = require('../utils/mailer');
 const Profile = require('../models/Profile');
 const Post = require('../models/Post');
 const Reply = require('../models/Reply');
@@ -116,7 +117,7 @@ const login = async (req, res) => {
   }
 };
 
-// @desc    Forgot password — generates reset token and returns it
+// @desc    Forgot password — emails a 6-digit reset code
 // @route   POST /api/auth/forgot-password
 // @access  Public
 const forgotPassword = async (req, res) => {
@@ -128,52 +129,60 @@ const forgotPassword = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No user found with this email' });
+
+    // Only generate/send a code if the account exists, but always return the
+    // same generic response so requests can't be used to discover which
+    // emails are registered.
+    if (user) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+      user.resetPasswordToken = crypto.createHash('sha256').update(code).digest('hex');
+      user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+      await user.save({ validateBeforeSave: false });
+
+      try {
+        await sendPasswordResetEmail(user.email, code);
+      } catch (emailError) {
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        await user.save({ validateBeforeSave: false });
+        console.error('Failed to send password reset email:', emailError.message);
+        return res.status(500).json({ success: false, message: 'Failed to send reset email. Please try again later.' });
+      }
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-
-    // Hash token and set expiry (10 minutes)
-    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-    await user.save({ validateBeforeSave: false });
-
-    // In production, send this token via email (e.g., Nodemailer / SendGrid)
-    // For now, return it in the response for testing
     res.status(200).json({
       success: true,
-      message: 'Password reset token generated. Use it with /api/auth/reset-password.',
-      resetToken,
+      message: 'If an account exists for this email, a reset code has been sent.',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Reset password using token
-// @route   POST /api/auth/reset-password/:token
+// @desc    Reset password using the emailed code
+// @route   POST /api/auth/reset-password
 // @access  Public
 const resetPassword = async (req, res) => {
   try {
-    const { password } = req.body;
+    const { email, code, password } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ success: false, message: 'Please provide a new password' });
+    if (!email || !code || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide email, code, and a new password' });
     }
 
-    // Hash the token from the URL
-    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    // Hash the submitted code to compare against the stored hash
+    const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
 
-    // Find user by token and check expiry
+    // Find user by email + code and check expiry
     const user = await User.findOne({
-      resetPasswordToken: hashedToken,
+      email,
+      resetPasswordToken: hashedCode,
       resetPasswordExpire: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset code' });
     }
 
     // Set new password & clear reset fields

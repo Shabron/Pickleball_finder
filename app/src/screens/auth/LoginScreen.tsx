@@ -129,9 +129,9 @@ export default function LoginScreen({ navigation }: any) {
               containerStyle={{ marginBottom: spacing.sm }}
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotPasswordContainer}
-              onPress={() => { /* Navigate to forgot password */ }}
+              onPress={() => navigation.navigate('ForgotPassword')}
             >
               <Text style={[styles.forgotPasswordText, { color: colors.brandGreen }]}>Forgot password?</Text>
             </TouchableOpacity>

@@ -60,6 +60,50 @@ export const authApi = {
     }
   },
 
+  forgotPassword: async (email: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send reset email');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (email: string, code: string, password: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, code, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reset password');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
+  },
+
   /** Validate the stored token — returns user data or throws if expired/invalid */
   getMe: async () => {
     const token = await getToken();

@@ -20,6 +20,8 @@ import SignupScreen from '../screens/auth/SignupScreen';
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import TermsScreen from '../screens/auth/TermsScreen';
 import PrivacyPolicyScreen from '../screens/auth/PrivacyPolicyScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 
 // Onboarding / Profile
 import CreateProfileScreen from '../screens/profile/CreateProfileScreen';
@@ -71,8 +73,10 @@ export default function AppNavigator() {
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
-          <Stack.Screen 
-            name="Terms" 
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen
+            name="Terms"
             component={TermsScreen} 
             initialParams={pendingTerms ? { token: pendingTerms.token, userData: pendingTerms.userData } : undefined}
           />

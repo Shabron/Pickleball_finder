@@ -137,7 +137,11 @@ curl -X POST http://localhost:8081/api/auth/login \
 
 ### `POST /api/auth/forgot-password`
 
-Request a password reset token.
+Request a password reset code. If an account exists for the given email, a
+6-digit code is generated (valid for 10 minutes) and emailed to the user via
+`backend/src/utils/mailer.js`. The response is always the same generic
+message, regardless of whether the email is registered, so this endpoint
+can't be used to discover which emails have accounts.
 
 **Request Body**
 
@@ -157,39 +161,34 @@ curl -X POST http://localhost:8081/api/auth/forgot-password \
 ```json
 {
   "success": true,
-  "message": "Password reset token generated. Use it with /api/auth/reset-password.",
-  "resetToken": "a1b2c3d4e5f6..."
+  "message": "If an account exists for this email, a reset code has been sent."
 }
 ```
 
 **Error Responses**
 - `400` — Missing email
-- `404` — No user found with this email
-
-> **Note:** In production, the `resetToken` should be sent via email instead of being returned in the response.
+- `500` — Email failed to send (SMTP misconfigured/unreachable)
 
 ---
 
-### `POST /api/auth/reset-password/:token`
+### `POST /api/auth/reset-password`
 
-Reset password using the token from forgot-password.
-
-**URL Params**
-
-| Param   | Description                              |
-|---------|------------------------------------------|
-| `token` | Reset token received from forgot-password |
+Reset password using the code emailed from forgot-password.
 
 **Request Body**
 
-| Field      | Type   | Required | Description       |
-|------------|--------|----------|-------------------|
-| `password` | String | ✅       | New password (min 6 chars) |
+| Field      | Type   | Required | Description                 |
+|------------|--------|----------|------------------------------|
+| `email`    | String | ✅       | Same email used to request the code |
+| `code`     | String | ✅       | 6-digit code from the email |
+| `password` | String | ✅       | New password (min 6 chars)  |
 
 ```bash
-curl -X POST http://localhost:8081/api/auth/reset-password/YOUR_RESET_TOKEN \
+curl -X POST http://localhost:8081/api/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{
+    "email": "john@example.com",
+    "code": "123456",
     "password": "newpassword456"
   }'
 ```
@@ -209,7 +208,7 @@ curl -X POST http://localhost:8081/api/auth/reset-password/YOUR_RESET_TOKEN \
 ```
 
 **Error Responses**
-- `400` — Missing password or invalid/expired token
+- `400` — Missing fields or invalid/expired code
 
 ---
 
