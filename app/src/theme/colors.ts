@@ -1,5 +1,5 @@
 /**
- * Pickleball Finder — "Ocean Wave" Design System Colors
+ * Senior Pickleball Partners — "Ocean Wave" Design System Colors
  *
  * Updated neutral/blue theme based on the new design screenshot.
  */
@@ -77,65 +77,4 @@ export const lightColors = {
 /** Color theme type */
 export type ThemeColors = {
   [K in keyof typeof lightColors]: string;
-};
-
-// ─── Dark Theme ──────────────────────────────────────────────────────
-export const darkColors: ThemeColors = {
-  primary: '#63B3ED',
-  primaryContainer: '#08253A',
-  primaryDim: '#4299E1',
-  onPrimary: '#1A365D',
-  onPrimaryContainer: '#DDF0FF',
-
-  secondary: '#90CDF4',
-  secondaryContainer: '#1A365D',
-  secondaryDim: '#63B3ED',
-  onSecondary: '#1A365D',
-  onSecondaryContainer: '#EBF8FF',
-
-  tertiary: '#F6AD55',
-  tertiaryContainer: '#4A2311',
-  tertiaryDim: '#DD6B20',
-  onTertiary: '#4A2311',
-  onTertiaryContainer: '#FEEBC8',
-
-  error: '#FC8181',
-  errorContainer: '#4A0D0D',
-  onError: '#4A0D0D',
-  onErrorContainer: '#FED7D7',
-
-  surface: '#1A202C',
-  surfaceBright: '#2D3748',
-  surfaceDim: '#171923',
-  surfaceContainer: '#2D3748',
-  surfaceContainerHigh: '#4A5568',
-  surfaceContainerHighest: '#718096',
-  surfaceContainerLow: '#1A202C',
-  surfaceContainerLowest: '#171923',
-  surfaceTint: '#63B3ED',
-  surfaceVariant: '#4A5568',
-
-  onSurface: '#F7FAFC',
-  onSurfaceVariant: '#CBD5E0',
-  inverseSurface: '#F7FAFC',
-  inverseOnSurface: '#1A202C',
-  inversePrimary: '#1D628B',
-
-  outline: '#4A5568',
-  outlineVariant: '#2D3748',
-
-  success: '#68D391',
-  warning: '#F6E05E',
-
-  // Brand Green (Pickleball themed green)
-  brandGreen: '#81C784',
-  brandGreenContainer: '#1B5E20',
-  onBrandGreenContainer: '#E8F5E9',
-  homeBackground: '#16221B',
-  screenBackground: '#171923',
-
-  white: '#FFFFFF',
-  black: '#000000',
-  transparent: 'transparent',
-  scrim: 'rgba(0, 0, 0, 0.52)',
 };

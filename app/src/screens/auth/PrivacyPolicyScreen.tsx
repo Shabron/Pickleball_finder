@@ -52,7 +52,7 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
                 </Text>
               </View>
               <Text style={[typography.bodyLarge, styles.sectionText]}>
-                Welcome to <Text style={{ fontWeight: '700' }}>Pickleball Finder</Text>. We are committed to protecting your privacy and ensuring you have a safe and positive experience when using our mobile application.
+                Welcome to <Text style={{ fontWeight: '700' }}>Senior Pickleball Partners</Text>. We are committed to protecting your privacy and ensuring you have a safe and positive experience when using our mobile application.
                 {'\n\n'}
                 This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related backend services.
               </Text>

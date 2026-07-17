@@ -17,13 +17,13 @@ interface ScreenWrapperProps {
 }
 
 export default function ScreenWrapper({ children, style, backgroundColor }: ScreenWrapperProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const bg = backgroundColor || colors.screenBackground;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }, style]}>
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
+        barStyle="dark-content"
         backgroundColor={bg}
       />
       {children}

@@ -40,7 +40,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
       <View style={styles.mainSection}>
         <View style={styles.textSection}>
           <Text style={[typography.headlineMedium, styles.title, { color: '#0F2C4C' }]}>
-            Senior Pickleball Login
+            Senior Pickleball Partners Login
           </Text>
           <Text style={[typography.bodyLarge, styles.subtitle, { color: '#1B1B1B' }]}>
             Connect with friends, find matches, and stay active.

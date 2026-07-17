@@ -1,5 +1,5 @@
 /**
- * Pickleball Finder — Typography System
+ * Senior Pickleball Partners — Typography System
  *
  * Uses Lexend font family (engineered for readability, ideal for senior users).
  * "Top-Heavy" hierarchy: headlines are significantly larger than body text

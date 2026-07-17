@@ -2,7 +2,7 @@
  * SearchScreen — MatchMaking (Redesigned)
  *
  * Features:
- *  - App header with logo + "Senior Pickleball" branding
+ *  - App header with logo + "Senior Pickleball Partners" branding
  *  - Nearby players section with a live MapView of approximate locations
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
  *  - onEndReached appends more mock players (simulated pagination)
@@ -289,7 +289,7 @@ export default function SearchScreen({ navigation }: any) {
       // Default: Send an automated intro message (creates pending request)
       const res = await messageApi.sendMessage(
         player.id,
-        "Hi! I saw you on Pickleball Finder. Let's play!"
+        "Hi! I saw you on Senior Pickleball Partners. Let's play!"
       );
       if (res.success) {
         setAllPlayers(prev => prev.map(p => 

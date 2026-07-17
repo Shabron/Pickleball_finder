@@ -3,7 +3,7 @@
  *
  * Wraps the entire application in:
  *   1. SafeAreaProvider  — safe area insets for notched devices
- *   2. ThemeProvider     — global theme (light/dark/system)
+ *   2. ThemeProvider     — global theme (light mode only)
  *   3. AuthProvider      — auth bootstrap & persistent session
  */
 import React from 'react';
@@ -15,7 +15,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider initialMode="system">
+      <ThemeProvider>
         <AuthProvider>
           <AppNavigator />
         </AuthProvider>

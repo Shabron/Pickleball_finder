@@ -32,7 +32,7 @@ interface HeaderProps {
 }
 
 export default function Header({
-  title = 'Senior Pickleball',
+  title = 'Senior Pickleball Partners',
   showBack = false,
   onBack,
   rightAction,

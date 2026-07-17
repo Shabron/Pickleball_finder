@@ -1,5 +1,5 @@
 /**
- * Pickleball Finder — Theme Barrel
+ * Senior Pickleball Partners — Theme Barrel
  *
  * Central re-export of all theme tokens.
  * Import from here for convenience:
@@ -11,7 +11,7 @@ export { ThemeProvider, useTheme, makeStyles } from './ThemeContext';
 export type { Theme } from './ThemeContext';
 
 // Color tokens & types
-export { lightColors, darkColors } from './colors';
+export { lightColors } from './colors';
 export type { ThemeColors } from './colors';
 
 // Typography scale

@@ -130,7 +130,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
       // Default: Send an automated intro message
       const res = await messageApi.sendMessage(
         player.id,
-        "Hi! I saw you on Pickleball Finder. Let's play!"
+        "Hi! I saw you on Senior Pickleball Partners. Let's play!"
       );
       if (res.success) {
         setPlayer(prev => ({ ...prev, connectionStatus: 'pending_sent', conversationId: res.conversationId }));
@@ -146,7 +146,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
   if (loading || !player) {
     return (
       <ScreenWrapper>
-        <Header showLogo title="Senior Pickleball" showBack onBack={() => navigation.goBack()} />
+        <Header showLogo title="Senior Pickleball Partners" showBack onBack={() => navigation.goBack()} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text>Loading profile...</Text>
         </View>
@@ -165,7 +165,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
     <ScreenWrapper>
       <Header
         showLogo
-        title="Senior Pickleball"
+        title="Senior Pickleball Partners"
         showBack
         onBack={() => navigation.goBack()}
       />

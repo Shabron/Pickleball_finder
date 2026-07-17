@@ -59,6 +59,10 @@ export default function TermsScreen({ route, navigation }: any) {
     });
   };
 
+  const handleClose = () => {
+    navigation.goBack();
+  };
+
   return (
     <ScreenWrapper>
       <SafeAreaView style={{ flex: 1 }}>
@@ -96,7 +100,7 @@ export default function TermsScreen({ route, navigation }: any) {
                   We enforce a strict, zero-tolerance policy for harassment, hate speech, bullying, discrimination, or abusive behavior of any kind. 
                   {'\n\n'}
                   <Text style={{ fontWeight: '700' }}>
-                    Violators will be permanently and immediately banned from the Pickleball Finder community without warning.
+                    Violators will be permanently and immediately banned from the Senior Pickleball Partners community without warning.
                   </Text>
                 </Text>
               </View>
@@ -183,7 +187,7 @@ export default function TermsScreen({ route, navigation }: any) {
               ) : (
                 <Button
                   title="CLOSE"
-                  onPress={handleCancel}
+                  onPress={handleClose}
                   style={{ flex: 1 }}
                   textStyle={{ fontWeight: 'bold' }}
                 />

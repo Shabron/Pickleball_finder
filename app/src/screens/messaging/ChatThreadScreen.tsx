@@ -17,7 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { ChevronLeft, Send, Phone, MoreVertical } from 'lucide-react-native';
+import { ChevronLeft, Send, MoreVertical } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
@@ -179,13 +179,8 @@ export default function ChatThreadScreen({ navigation, route }: any) {
             <Text style={[typography.labelSmall, { color: colors.success }]}>Online</Text>
           </View>
 
-          <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Phone color={colors.onSurfaceVariant} size={sizes.iconDefault} />
-          </TouchableOpacity>
-
           <TouchableOpacity
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={{ marginLeft: spacing.md }}
           >
             <MoreVertical color={colors.onSurfaceVariant} size={sizes.iconDefault} />
           </TouchableOpacity>

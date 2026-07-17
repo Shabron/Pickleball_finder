@@ -1,5 +1,5 @@
 /**
- * Pickleball Finder — Spacing & Shape System
+ * Senior Pickleball Partners — Spacing & Shape System
  *
  * Responsive spacing that scales with device width.
  * Includes border radius tokens matching Stitch roundness presets.

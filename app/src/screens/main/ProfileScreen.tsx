@@ -21,7 +21,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
 export default function ProfileScreen({ navigation }: any) {
-  const { colors, typography, toggleTheme, isDark } = useTheme();
+  const { colors, typography } = useTheme();
   const { logout, user } = useAuth();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -277,7 +277,7 @@ export default function ProfileScreen({ navigation }: any) {
             { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.lg },
           ]}
         >
-          Senior Pickleball v1.0.0
+          Senior Pickleball Partners v1.0.0
         </Text>
       </ScrollView>
       )}

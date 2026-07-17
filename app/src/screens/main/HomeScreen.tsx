@@ -106,7 +106,7 @@ export default function HomeScreen({ navigation }: any) {
     try {
       const res = await messageApi.sendMessage(
         authorId,
-        "Hi! I saw your post on Pickleball Finder."
+        "Hi! I saw your post on Senior Pickleball Partners."
       );
       if (res.success) {
         navigation.navigate('ChatThread', {
