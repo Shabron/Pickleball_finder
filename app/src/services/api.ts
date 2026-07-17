@@ -146,6 +146,56 @@ export const authApi = {
   },
 };
 
+export const userApi = {
+  registerPushToken: async (token: string, platform: 'ios' | 'android') => {
+    try {
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/users/push-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ token, platform }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to register push token');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Register push token error:', error);
+      throw error;
+    }
+  },
+
+  removePushToken: async (token: string) => {
+    try {
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/users/push-token`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to remove push token');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Remove push token error:', error);
+      throw error;
+    }
+  },
+};
+
 export const profileApi = {
   getProfile: async () => {
     try {

@@ -66,6 +66,11 @@ yarn-error.log
 # testing
 /coverage
 
+# Firebase config (per-environment, not meant to be shared in source control)
+google-services.json
+GoogleService-Info.plist
+*.p8
+
 # Yarn
 .yarn/*
 !.yarn/patches

@@ -22,9 +22,69 @@ PODS:
     - ReactNativeDependencies
     - Yoga
   - FBLazyVector (0.84.1)
+  - Firebase/CoreOnly (12.15.0):
+    - FirebaseCore (~> 12.15.0)
+  - Firebase/Messaging (12.15.0):
+    - Firebase/CoreOnly
+    - FirebaseMessaging (~> 12.15.0)
+  - FirebaseCore (12.15.0):
+    - FirebaseCoreInternal (~> 12.15.0)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/Logger (~> 8.1)
+  - FirebaseCoreExtension (12.15.0):
+    - FirebaseCore (~> 12.15.0)
+  - FirebaseCoreInternal (12.15.0):
+    - "GoogleUtilities/NSData+zlib (~> 8.1)"
+  - FirebaseInstallations (12.15.0):
+    - FirebaseCore (~> 12.15.0)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - PromisesObjC (~> 2.4)
+  - FirebaseMessaging (12.15.0):
+    - FirebaseCore (~> 12.15.0)
+    - FirebaseInstallations (~> 12.15.0)
+    - GoogleDataTransport (~> 10.1)
+    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/Reachability (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - nanopb (~> 3.30910.0)
+  - GoogleDataTransport (10.1.0):
+    - nanopb (~> 3.30910.0)
+    - PromisesObjC (~> 2.4)
+  - GoogleUtilities/AppDelegateSwizzler (8.1.2):
+    - GoogleUtilities/Environment
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Network
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Environment (8.1.2):
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Logger (8.1.2):
+    - GoogleUtilities/Environment
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Network (8.1.2):
+    - GoogleUtilities/Logger
+    - "GoogleUtilities/NSData+zlib"
+    - GoogleUtilities/Privacy
+    - GoogleUtilities/Reachability
+  - "GoogleUtilities/NSData+zlib (8.1.2)":
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Privacy (8.1.2)
+  - GoogleUtilities/Reachability (8.1.2):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/UserDefaults (8.1.2):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
   - hermes-engine (250829098.0.9):
     - hermes-engine/Pre-built (= 250829098.0.9)
   - hermes-engine/Pre-built (250829098.0.9)
+  - nanopb (3.30910.0):
+    - nanopb/decode (= 3.30910.0)
+    - nanopb/encode (= 3.30910.0)
+  - nanopb/decode (3.30910.0)
+  - nanopb/encode (3.30910.0)
+  - PromisesObjC (2.4.1)
   - RCTDeprecation (0.84.1)
   - RCTRequired (0.84.1)
   - RCTSwiftUI (0.84.1)
@@ -1945,6 +2005,59 @@ PODS:
     - React-utils (= 0.84.1)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.84.1)
+  - RNFBApp (25.1.0):
+    - Firebase/CoreOnly (= 12.15.0)
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - RNFBMessaging (25.1.0):
+    - Firebase/Messaging (= 12.15.0)
+    - FirebaseCoreExtension
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - RNFBApp
+    - Yoga
+  - RNNotifee (9.1.8):
+    - React-Core
+    - RNNotifee/NotifeeCore (= 9.1.8)
+  - RNNotifee/NotifeeCore (9.1.8):
+    - React-Core
   - RNScreens (4.24.0):
     - hermes-engine
     - RCTRequired
@@ -2117,9 +2230,25 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
+  - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
+  - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
+
+SPEC REPOS:
+  trunk:
+    - Firebase
+    - FirebaseCore
+    - FirebaseCoreExtension
+    - FirebaseCoreInternal
+    - FirebaseInstallations
+    - FirebaseMessaging
+    - GoogleDataTransport
+    - GoogleUtilities
+    - nanopb
+    - PromisesObjC
 
 EXTERNAL SOURCES:
   AsyncStorage:
@@ -2275,6 +2404,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  RNFBApp:
+    :path: "../node_modules/@react-native-firebase/app"
+  RNFBMessaging:
+    :path: "../node_modules/@react-native-firebase/messaging"
+  RNNotifee:
+    :path: "../node_modules/@notifee/react-native"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSVG:
@@ -2285,7 +2420,17 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AsyncStorage: 2e1d431842588f5af845737e6435c1fcbecdab51
   FBLazyVector: e97c19a5a442429d1988f182a1940fb08df514da
+  Firebase: a8539b633d474fbeb654c7043f9c1649e274045b
+  FirebaseCore: 2e86a4ea1684d4381707069e4a6d89ac808e901e
+  FirebaseCoreExtension: 10d2a627977b39418759ad88ada80fbbd34f1c4f
+  FirebaseCoreInternal: 6ab6a02c94446c026d2cf35cf5383842ebaa4992
+  FirebaseInstallations: eb29ccbf64eaedf86fd5b2ccc7fabde567660b52
+  FirebaseMessaging: 40017d7bc8457ee295b0f41d480a80fdabc9994e
+  GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
+  GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
   hermes-engine: 57eb2c54acdeca6bdfeb9b20131235d487462744
+  nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   RCTDeprecation: af44b104091a34482596cd9bd7e8d90c4e9b4bd7
   RCTRequired: bb77b070f75f53398ce43c0aaaa58337cebe2bf6
   RCTSwiftUI: afc0a0a635860da1040a0b894bfd529da06d7810
@@ -2359,10 +2504,13 @@ SPEC CHECKSUMS:
   ReactCodegen: 797de5178718324c6eba3327b07f9a423fbd5787
   ReactCommon: 07572bf9e687c8a52fbe4a3641e9e3a1a477c78e
   ReactNativeDependencies: 1ad0c9569fdf4672b062d49fe2d417d26beeed2a
+  RNFBApp: 86e5eb7450782e735c8911d72c9454f69852089a
+  RNFBMessaging: 4cdc42c013b72aef376c4445508970d5a5aa88b9
+  RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNScreens: 6cb648bdad8fe9bee9259fe144df95b6d1d5b707
   RNSVG: c69f7709226108f5eb89b5aa8833c17a36345468
   Yoga: c0b3f2c7e8d3e327e450223a2414ca3fa296b9a2
 
-PODFILE CHECKSUM: b823eebba5b3bdcc8a94cc367182e8365285890d
+PODFILE CHECKSUM: ef3f9f1f5108941604ff7745d6a3ff85ed2213cc
 
 COCOAPODS: 1.16.2

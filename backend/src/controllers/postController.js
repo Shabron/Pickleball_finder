@@ -2,6 +2,7 @@ const Post = require('../models/Post');
 const Reply = require('../models/Reply');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
+const { sendPushNotification } = require('../utils/push');
 
 const stateNeighbors = {
   AL: ['FL', 'GA', 'MS', 'TN'],
@@ -340,6 +341,11 @@ const addReply = async (req, res) => {
             title: 'New Reply on your Post',
             body: `${replierName} replied: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
             referenceId: post._id,
+          });
+          await sendPushNotification(post.author, {
+            title: 'New Reply on your Post',
+            body: `${replierName} replied: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            data: { type: 'new_reply', referenceId: post._id.toString() },
           });
         }
       }

@@ -17,6 +17,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, setToken, clearToken } from '../services/api';
+import { requestNotificationPermission, registerPushToken, unregisterPushToken } from '../services/push';
 
 interface User {
   _id: string;
@@ -76,6 +77,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.success && res.data) {
           setUser(res.data);
           setIsAuthenticated(true);
+          // Re-register the push token in case it changed since the last
+          // session (no-ops silently if permission was never granted).
+          registerPushToken();
         } else {
           await clearToken();
         }
@@ -97,9 +101,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(userData);
     setIsNewSignup(isSignup);
     setIsAuthenticated(true);
+
+    // Ask for notification permission right after a fresh login/signup,
+    // then register the device's push token if granted.
+    const granted = await requestNotificationPermission();
+    if (granted) registerPushToken();
   }, []);
 
   const logout = useCallback(async () => {
+    await unregisterPushToken();
     await AsyncStorage.removeItem('@pending_terms');
     setPendingTerms(null);
     await clearToken();

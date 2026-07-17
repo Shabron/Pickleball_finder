@@ -2,6 +2,7 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
+const { sendPushNotification } = require('../utils/push');
 
 // @desc    Get all conversations for the logged-in user
 // @route   GET /api/messages/conversations
@@ -132,6 +133,11 @@ const sendMessage = async (req, res) => {
             body: `${senderName} wants to connect with you.`,
             referenceId: conversation._id,
           });
+          await sendPushNotification(receiverId, {
+            title: 'New Partner Request!',
+            body: `${senderName} wants to connect with you.`,
+            data: { type: 'request_sent', referenceId: conversation._id.toString() },
+          });
         }
       } else if (conversation.status === 'accepted') {
         if (receiverProfile?.notificationSettings?.messages !== false) {
@@ -141,6 +147,11 @@ const sendMessage = async (req, res) => {
             title: 'New Message',
             body: `${senderName}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
             referenceId: conversation._id,
+          });
+          await sendPushNotification(receiverId, {
+            title: 'New Message',
+            body: `${senderName}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            data: { type: 'new_message', referenceId: conversation._id.toString() },
           });
         }
       }
@@ -231,6 +242,11 @@ const acceptRequest = async (req, res) => {
           title: "It's a Match! 🎉",
           body: `${accepterName} accepted your request.`,
           referenceId: conversation._id,
+        });
+        await sendPushNotification(initiatorId, {
+          title: "It's a Match! 🎉",
+          body: `${accepterName} accepted your request.`,
+          data: { type: 'request_accepted', referenceId: conversation._id.toString() },
         });
       }
     } catch (notifErr) {

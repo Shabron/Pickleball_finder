@@ -27,6 +27,13 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpire: {
       type: Date,
     },
+    pushTokens: [
+      {
+        token: { type: String, required: true },
+        platform: { type: String, enum: ['ios', 'android'], required: true },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -8,6 +8,13 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# react-native-firebase's Swift pods (FirebaseCoreInternal → GoogleUtilities)
+# don't define modules, which breaks default static-library linking unless
+# Firebase itself is built as a static framework. See:
+# https://rnfirebase.io/#altering-cocoapods-static-linking
+$RNFirebaseAsStaticFramework = true
+use_modular_headers!
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green

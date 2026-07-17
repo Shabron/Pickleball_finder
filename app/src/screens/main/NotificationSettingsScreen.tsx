@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Switch, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { notificationApi } from '../../services/api';
+import { hasNotificationPermission, requestNotificationPermission, registerPushToken } from '../../services/push';
 
 export default function NotificationSettingsScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState<boolean | null>(null);
   const [settings, setSettings] = useState({
     requests: true,
     messages: true,
@@ -19,7 +21,18 @@ export default function NotificationSettingsScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchSettings();
+    hasNotificationPermission().then(setPushEnabled);
   }, []);
+
+  const handleEnablePush = async () => {
+    const granted = await requestNotificationPermission();
+    setPushEnabled(granted);
+    if (granted) {
+      registerPushToken();
+    } else {
+      Linking.openSettings();
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -73,6 +86,25 @@ export default function NotificationSettingsScreen({ navigation }: any) {
         </View>
       ) : (
         <View style={styles.container}>
+          <View style={[styles.toggleRow, { backgroundColor: colors.surfaceContainerLow }]}>
+            <View style={styles.toggleTextContainer}>
+              <Text style={[typography.titleSmall, { color: colors.onSurface }]}>Push Notifications</Text>
+              <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 4 }]}>
+                {pushEnabled
+                  ? 'Enabled on this device — the toggles below control what you get notified about.'
+                  : 'Turn on system push notifications to get alerts even when the app is closed.'}
+              </Text>
+            </View>
+            {!pushEnabled && (
+              <TouchableOpacity
+                onPress={handleEnablePush}
+                style={[styles.enableButton, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[typography.labelSmall, { color: '#FFFFFF', fontWeight: 'bold' }]}>Enable</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {renderToggle('requests', 'Connection Requests', 'Get notified when someone wants to connect with you')}
           {renderToggle('messages', 'New Messages', 'Get notified when you receive a new direct message')}
           {renderToggle('replies', 'Post Replies', 'Get notified when someone replies to your post')}
@@ -104,5 +136,10 @@ const styles = StyleSheet.create({
   toggleTextContainer: {
     flex: 1,
     marginRight: spacing.md,
+  },
+  enableButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
   },
 });

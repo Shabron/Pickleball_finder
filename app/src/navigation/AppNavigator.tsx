@@ -13,6 +13,7 @@ import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { navigationRef } from './navigationRef';
 
 // Auth
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -58,7 +59,7 @@ export default function AppNavigator() {
   const { isLoading, isAuthenticated, isNewSignup, pendingTerms } = useAuth();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {isLoading ? (
         // Show spinner inside the single container while bootstrapping
         <Stack.Navigator screenOptions={{ headerShown: false }}>
