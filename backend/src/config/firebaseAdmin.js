@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
 
 let app = null;
 let initAttempted = false;
@@ -26,8 +26,8 @@ const getFirebaseApp = () => {
       return null;
     }
 
-    app = admin.initializeApp({
-      credential: admin.credential.cert(credentialJson),
+    app = initializeApp({
+      credential: cert(credentialJson),
     });
     console.log('[firebaseAdmin] Firebase Admin initialized — push notifications enabled.');
   } catch (error) {

@@ -1,3 +1,4 @@
+const { getMessaging } = require('firebase-admin/messaging');
 const { getFirebaseApp } = require('../config/firebaseAdmin');
 const User = require('../models/User');
 
@@ -35,7 +36,7 @@ const sendPushNotification = async (recipientId, { title, body, data = {} }) => 
     Object.entries(data).map(([key, value]) => [key, String(value)])
   );
 
-  const response = await app.messaging().sendEachForMulticast({
+  const response = await getMessaging(app).sendEachForMulticast({
     tokens,
     notification: { title, body },
     data: stringData,
