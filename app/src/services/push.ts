@@ -55,6 +55,10 @@ export const registerPushToken = async (): Promise<void> => {
 
     await ensureAndroidChannel();
 
+    if (Platform.OS === 'ios' && !messaging().isDeviceRegisteredForRemoteMessages) {
+      await messaging().registerDeviceForRemoteMessages();
+    }
+
     const token = await messaging().getToken();
     await userApi.registerPushToken(token, Platform.OS as 'ios' | 'android');
   } catch (error) {
@@ -65,6 +69,10 @@ export const registerPushToken = async (): Promise<void> => {
 /** Removes this device's token from the backend — call on logout. */
 export const unregisterPushToken = async (): Promise<void> => {
   try {
+    if (Platform.OS === 'ios' && !messaging().isDeviceRegisteredForRemoteMessages) {
+      await messaging().registerDeviceForRemoteMessages();
+    }
+
     const token = await messaging().getToken();
     await userApi.removePushToken(token);
   } catch (error) {

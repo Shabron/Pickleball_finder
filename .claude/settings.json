@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/* && echo \"Cleared.\" && df -h / | tail -1)",
+      "Bash(pod --version)",
+      "Bash(pod install *)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :BUNDLE_ID\" ios/PickleballApp/GoogleService-Info.plist)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print\" PickleballApp/GoogleService-Info.plist)"
+    ],
+    "additionalDirectories": [
+      "/Users/impatidar/Library/Developer/Xcode/DerivedData"
+    ]
+  }
+}
