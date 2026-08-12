@@ -7,7 +7,7 @@
  * - Inline compose bar — requires auth to post (graceful alert if not)
  * - Optimistic append on submit
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -48,7 +48,14 @@ interface InlineRepliesProps {
   initialCount?: number;
 }
 
-export default function InlineReplies({ postId, initialCount = 0 }: InlineRepliesProps) {
+export interface InlineRepliesHandle {
+  openReply: () => void;
+}
+
+const InlineReplies = forwardRef<InlineRepliesHandle, InlineRepliesProps>(function InlineReplies(
+  { postId, initialCount = 0 },
+  ref
+) {
   const { colors, typography } = useTheme();
 
   const [expanded, setExpanded] = useState(false);
@@ -101,6 +108,10 @@ export default function InlineReplies({ postId, initialCount = 0 }: InlineReplie
     setShowCompose(true);
     setTimeout(() => inputRef.current?.focus(), 200);
   };
+
+  useImperativeHandle(ref, () => ({
+    openReply: handleReplyButtonPress,
+  }));
 
   const handleSubmit = async () => {
     const trimmed = replyText.trim();
@@ -247,7 +258,9 @@ export default function InlineReplies({ postId, initialCount = 0 }: InlineReplie
       )}
     </View>
   );
-}
+});
+
+export default InlineReplies;
 
 const styles = StyleSheet.create({
   wrapper: {

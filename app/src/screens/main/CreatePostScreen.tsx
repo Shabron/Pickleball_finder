@@ -22,6 +22,7 @@ import Dropdown from '../../components/common/Dropdown';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { postApi } from '../../services/api';
+import { US_STATES } from '../../constants/states';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -36,14 +37,6 @@ const PLAY_STYLE_OPTIONS = [
   { label: 'Doubles', value: 'doubles' },
   { label: 'Mixed Doubles', value: 'mixed' },
   { label: 'Any', value: 'any' },
-];
-
-const US_STATES = [
-  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
-  { label: 'Arizona', value: 'AZ' }, { label: 'California', value: 'CA' },
-  { label: 'Colorado', value: 'CO' }, { label: 'Florida', value: 'FL' },
-  { label: 'Georgia', value: 'GA' }, { label: 'New York', value: 'NY' },
-  { label: 'North Carolina', value: 'NC' }, { label: 'Texas', value: 'TX' },
 ];
 
 export default function CreatePostScreen({ navigation, route }: any) {

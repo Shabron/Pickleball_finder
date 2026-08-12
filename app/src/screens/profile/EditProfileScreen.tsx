@@ -28,6 +28,8 @@ import Avatar from '../../components/common/Avatar';
 import Badge from '../../components/common/Badge';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { US_STATES } from '../../constants/states';
+import { DAYPART_PRESETS } from '../../constants/availability';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -42,14 +44,6 @@ const PLAY_STYLE_OPTIONS = [
   { label: 'Doubles', value: 'doubles' },
   { label: 'Mixed Doubles', value: 'mixed' },
   { label: 'Any / All Types', value: 'any' },
-];
-
-const US_STATES = [
-  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
-  { label: 'Arizona', value: 'AZ' }, { label: 'California', value: 'CA' },
-  { label: 'Colorado', value: 'CO' }, { label: 'Florida', value: 'FL' },
-  { label: 'Georgia', value: 'GA' }, { label: 'New York', value: 'NY' },
-  { label: 'North Carolina', value: 'NC' }, { label: 'Texas', value: 'TX' },
 ];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -139,6 +133,21 @@ export default function EditProfileScreen({ navigation }: any) {
         },
       },
     }));
+  };
+
+  // Merges the preset's days/times into the existing schedule instead of
+  // replacing it, so multiple dayparts (e.g. Weekday Morning + Weekend Evening)
+  // can be combined on top of each other and on top of manual edits below.
+  const applyDaypartPreset = (presetKey: string) => {
+    const preset = DAYPART_PRESETS.find((p) => p.key === presetKey);
+    if (!preset) return;
+    setProfile((prev) => {
+      const avail = { ...prev.availability };
+      preset.days.forEach((d) => {
+        avail[d] = { start: preset.start, end: preset.end };
+      });
+      return { ...prev, availability: avail };
+    });
   };
 
   const applyPreset = (preset: string) => {
@@ -351,22 +360,49 @@ export default function EditProfileScreen({ navigation }: any) {
 
           {/* ─── Quick Presets ─── */}
           <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>
-            Quick Select
+            Presets
           </Text>
           <View style={styles.presetGrid}>
-            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekdays_evening')}>
-              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekday Evenings</Text>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('weekdays_evening')}>
+              <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Weekday Evenings</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekends')}>
-              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekends</Text>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('weekends')}>
+              <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Weekends</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('any')}>
-              <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Any Time</Text>
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('any')}>
+              <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Any Time</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.surfaceContainerHigh }]} onPress={() => applyPreset('clear')}>
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Clear All</Text>
+            <TouchableOpacity
+              style={[styles.presetChip, styles.presetChipOutline, { backgroundColor: colors.surface, borderColor: colors.outline }]}
+              onPress={() => applyPreset('clear')}
+            >
+              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, fontWeight: '600' }]}>Clear All</Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
+            By Time of Day
+          </Text>
+          {(['Weekday', 'Weekend'] as const).map((group) => (
+            <View key={group} style={{ marginBottom: spacing.md }}>
+              <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+                {group}
+              </Text>
+              <View style={styles.presetGrid}>
+                {DAYPART_PRESETS.filter((p) => p.group === group).map((preset) => (
+                  <TouchableOpacity
+                    key={preset.key}
+                    style={[styles.presetChip, { backgroundColor: colors.secondary }]}
+                    onPress={() => applyDaypartPreset(preset.key)}
+                  >
+                    <Text style={[typography.labelMedium, { color: colors.onSecondary, fontWeight: '700' }]}>
+                      {preset.shortLabel}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
 
           <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xl, opacity: 0.3 }} />
 
@@ -480,6 +516,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  presetChipOutline: {
+    borderWidth: 1.5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   dayRow: {
     flexDirection: 'row',

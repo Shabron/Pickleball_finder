@@ -1,5 +1,6 @@
 const Post = require('../models/Post');
 const Reply = require('../models/Reply');
+const SavedPost = require('../models/SavedPost');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
 const { sendPushNotification } = require('../utils/push');
@@ -363,5 +364,73 @@ const addReply = async (req, res) => {
   }
 };
 
-module.exports = { getPosts, createPost, updatePost, getMyPosts, getPostById, getReplies, addReply };
+// @desc    Save a post
+// @route   POST /api/posts/:id/save
+// @access  Private
+const savePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    try {
+      await SavedPost.create({ user: req.user._id, post: req.params.id });
+    } catch (err) {
+      if (err.code !== 11000) throw err; // already saved — treat as success
+    }
+
+    return res.status(200).json({ success: true, message: 'Post saved' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Unsave a post
+// @route   DELETE /api/posts/:id/save
+// @access  Private
+const unsavePost = async (req, res) => {
+  try {
+    await SavedPost.findOneAndDelete({ user: req.user._id, post: req.params.id });
+    return res.status(200).json({ success: true, message: 'Post unsaved' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get current user's saved posts
+// @route   GET /api/posts/saved/my
+// @access  Private
+const getSavedPosts = async (req, res) => {
+  try {
+    const savedPosts = await SavedPost.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'post',
+        populate: { path: 'author', select: 'name email' },
+      });
+
+    const posts = savedPosts.map((s) => s.post).filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      data: { posts },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  getPosts,
+  createPost,
+  updatePost,
+  getMyPosts,
+  getPostById,
+  getReplies,
+  addReply,
+  savePost,
+  unsavePost,
+  getSavedPosts,
+};
 

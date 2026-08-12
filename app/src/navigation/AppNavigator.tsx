@@ -40,6 +40,7 @@ import CreatePostScreen from '../screens/main/CreatePostScreen';
 import AboutScreen from '../screens/main/AboutScreen';
 import UserProfileScreen from '../screens/main/UserProfileScreen';
 import PostRepliesScreen from '../screens/main/PostRepliesScreen';
+import SavedPostsScreen from '../screens/main/SavedPostsScreen';
 
 // Auth context
 import { useAuth } from '../context/AuthContext';
@@ -109,6 +110,7 @@ export default function AppNavigator() {
           <Stack.Screen name="About" component={AboutScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
+          <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
           <Stack.Screen name="Terms" component={TermsScreen} />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>

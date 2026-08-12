@@ -20,35 +20,7 @@ import FAB from '../../components/common/FAB';
 import Slider from '../../components/common/Slider';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
-
-const US_STATES = [
-  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
-  { label: 'Arizona', value: 'AZ' }, { label: 'Arkansas', value: 'AR' },
-  { label: 'California', value: 'CA' }, { label: 'Colorado', value: 'CO' },
-  { label: 'Connecticut', value: 'CT' }, { label: 'Delaware', value: 'DE' },
-  { label: 'Florida', value: 'FL' }, { label: 'Georgia', value: 'GA' },
-  { label: 'Hawaii', value: 'HI' }, { label: 'Idaho', value: 'ID' },
-  { label: 'Illinois', value: 'IL' }, { label: 'Indiana', value: 'IN' },
-  { label: 'Iowa', value: 'IA' }, { label: 'Kansas', value: 'KS' },
-  { label: 'Kentucky', value: 'KY' }, { label: 'Louisiana', value: 'LA' },
-  { label: 'Maine', value: 'ME' }, { label: 'Maryland', value: 'MD' },
-  { label: 'Massachusetts', value: 'MA' }, { label: 'Michigan', value: 'MI' },
-  { label: 'Minnesota', value: 'MN' }, { label: 'Mississippi', value: 'MS' },
-  { label: 'Missouri', value: 'MO' }, { label: 'Montana', value: 'MT' },
-  { label: 'Nebraska', value: 'NE' }, { label: 'Nevada', value: 'NV' },
-  { label: 'New Hampshire', value: 'NH' }, { label: 'New Jersey', value: 'NJ' },
-  { label: 'New Mexico', value: 'NM' }, { label: 'New York', value: 'NY' },
-  { label: 'North Carolina', value: 'NC' }, { label: 'North Dakota', value: 'ND' },
-  { label: 'Ohio', value: 'OH' }, { label: 'Oklahoma', value: 'OK' },
-  { label: 'Oregon', value: 'OR' }, { label: 'Pennsylvania', value: 'PA' },
-  { label: 'Rhode Island', value: 'RI' }, { label: 'South Carolina', value: 'SC' },
-  { label: 'South Dakota', value: 'SD' }, { label: 'Tennessee', value: 'TN' },
-  { label: 'Texas', value: 'TX' }, { label: 'Utah', value: 'UT' },
-  { label: 'Vermont', value: 'VT' }, { label: 'Virginia', value: 'VA' },
-  { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
-  { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
-  { label: 'District of Columbia', value: 'DC' },
-];
+import { US_STATES } from '../../constants/states';
 
 const formatTimeAgo = (dateString: string) => {
   if (!dateString) return '';
@@ -68,8 +40,9 @@ export default function HomeScreen({ navigation }: any) {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
 
-  // Fetch unread notifications count whenever home is focused
+  // Fetch unread notifications count and saved post ids whenever home is focused
   useFocusEffect(
     React.useCallback(() => {
       const fetchUnreadCount = async () => {
@@ -82,7 +55,18 @@ export default function HomeScreen({ navigation }: any) {
           console.error('Failed to fetch unread notifications count:', error);
         }
       };
+      const fetchSavedPostIds = async () => {
+        try {
+          const res = await postApi.getSavedPosts();
+          if (res.success) {
+            setSavedPostIds(new Set(res.data.posts.map((p: any) => p._id)));
+          }
+        } catch (error) {
+          console.error('Failed to fetch saved posts:', error);
+        }
+      };
       fetchUnreadCount();
+      fetchSavedPostIds();
     }, [])
   );
 
@@ -204,6 +188,7 @@ export default function HomeScreen({ navigation }: any) {
                 playStyle: item.playStyle,
                 location: `${item.city ? item.city + ', ' : ''}${item.state}`,
               }}
+              initialSaved={savedPostIds.has(item._id)}
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
               onMessage={() => handleMessage(item.author._id, item.author.name)}
             />
@@ -212,7 +197,8 @@ export default function HomeScreen({ navigation }: any) {
       )}
 
       <FAB
-        icon={<Text style={{ fontSize: 24 }}>🏓</Text>}
+        icon={<Plus color={colors.onPrimary} size={22} strokeWidth={2.5} />}
+        label="New Post"
         onPress={() => navigation.navigate('CreatePost')}
       />
     </ScreenWrapper>

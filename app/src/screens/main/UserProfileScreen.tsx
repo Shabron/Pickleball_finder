@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import {
   MapPin,
-  MessageCircle,
   CircleCheck,
   Zap,
   Trophy,
@@ -307,17 +306,6 @@ export default function UserProfileScreen({ navigation, route }: any) {
         {/* ─── Actions ─── */}
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={[styles.btnMessage, { borderColor: colors.primary }]}
-            activeOpacity={0.75}
-            onPress={() => navigation.navigate('ChatThread', { userId, name: player.fullName, conversationId: player.conversationId })}
-          >
-            <MessageCircle size={18} color={colors.primary} />
-            <Text style={[typography.labelLarge, { color: colors.primary, fontWeight: '700', marginLeft: 6 }]}>
-              Message
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
             style={[
               styles.btnConnect,
               { backgroundColor: player.connectionStatus === 'pending_sent' ? colors.surfaceContainerHighest : colors.primary }
@@ -483,15 +471,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.sm,
-  },
-  btnMessage: {
-    flex: 1,
-    height: 52,
-    borderRadius: borderRadius.full,
-    borderWidth: 2,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   btnConnect: {
     flex: 1,

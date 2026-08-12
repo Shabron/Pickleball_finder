@@ -464,6 +464,75 @@ export const postApi = {
       throw error;
     }
   },
+
+  savePost: async (postId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save post');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Save post error:', error);
+      throw error;
+    }
+  },
+
+  unsavePost: async (postId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/posts/${postId}/save`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to unsave post');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Unsave post error:', error);
+      throw error;
+    }
+  },
+
+  getSavedPosts: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/posts/saved/my`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch saved posts');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get saved posts error:', error);
+      throw error;
+    }
+  },
 };
 
 export const matchmakingApi = {

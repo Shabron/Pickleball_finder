@@ -2,10 +2,30 @@ const express = require('express');
 const router = express.Router();
 
 const { protect } = require('../middleware/auth');
-const { getPosts, createPost, updatePost, getMyPosts, getPostById, getReplies, addReply } = require('../controllers/postController');
+const {
+  getPosts,
+  createPost,
+  updatePost,
+  getMyPosts,
+  getPostById,
+  getReplies,
+  addReply,
+  savePost,
+  unsavePost,
+  getSavedPosts,
+} = require('../controllers/postController');
 
 // GET /api/posts/my — list logged in user's posts
 router.get('/my', protect, getMyPosts);
+
+// GET /api/posts/saved/my — list logged in user's saved posts
+router.get('/saved/my', protect, getSavedPosts);
+
+// POST /api/posts/:id/save — save a post (authenticated)
+router.post('/:id/save', protect, savePost);
+
+// DELETE /api/posts/:id/save — unsave a post (authenticated)
+router.delete('/:id/save', protect, unsavePost);
 
 // GET /api/posts/:id/replies — list replies for a post (public)
 router.get('/:id/replies', getReplies);

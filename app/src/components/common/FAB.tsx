@@ -5,7 +5,7 @@
  * Primary color, large touch target (56px).
  */
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { sizes, spacing } from '../../theme/spacing';
 
@@ -13,10 +13,12 @@ interface FABProps {
   icon: React.ReactNode;
   onPress: () => void;
   style?: ViewStyle;
+  /** Optional label — when provided, the FAB extends into a labeled pill instead of a plain circle */
+  label?: string;
 }
 
-export default function FAB({ icon, onPress, style }: FABProps) {
-  const { colors } = useTheme();
+export default function FAB({ icon, onPress, style, label }: FABProps) {
+  const { colors, typography } = useTheme();
 
   return (
     <TouchableOpacity
@@ -24,11 +26,22 @@ export default function FAB({ icon, onPress, style }: FABProps) {
       activeOpacity={0.8}
       style={[
         styles.fab,
+        label ? styles.fabExtended : null,
         { backgroundColor: colors.primary },
         style,
       ]}
     >
       {icon}
+      {label && (
+        <Text
+          style={[
+            typography.labelLarge,
+            { color: colors.onPrimary, fontWeight: '700', marginLeft: spacing.sm },
+          ]}
+        >
+          {label}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -49,5 +62,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 24,
     elevation: 6,
+  },
+  fabExtended: {
+    flexDirection: 'row',
+    width: undefined,
+    paddingHorizontal: spacing.xl,
+    borderRadius: sizes.touchTarget / 2,
   },
 });

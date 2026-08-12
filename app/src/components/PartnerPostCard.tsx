@@ -5,12 +5,13 @@
  * XL corners, theme-aware colors, accessible touch targets.
  * Replies expand inline Facebook-style below the card actions.
  */
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { MessageSquare, Bookmark, CornerUpLeft } from 'lucide-react-native';
 import Card from './common/Card';
 import Avatar from './common/Avatar';
-import InlineReplies from './InlineReplies';
+import InlineReplies, { InlineRepliesHandle } from './InlineReplies';
+import { postApi, getToken } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme/spacing';
 
@@ -27,18 +28,41 @@ export interface PartnerPostData {
 
 interface PartnerPostCardProps {
   post: PartnerPostData;
-  onSave?: () => void;
+  initialSaved?: boolean;
   onMessage?: () => void;
   onPress?: () => void;
 }
 
 export default function PartnerPostCard({
   post,
-  onSave,
+  initialSaved = false,
   onMessage,
   onPress,
 }: PartnerPostCardProps) {
   const { colors, typography } = useTheme();
+  const inlineRepliesRef = useRef<InlineRepliesHandle>(null);
+  const [saved, setSaved] = useState(initialSaved);
+
+  const handleSaveToggle = async () => {
+    const token = await getToken();
+    if (!token) {
+      Alert.alert('Sign in required', 'Please log in to save this post.');
+      return;
+    }
+
+    const nextSaved = !saved;
+    setSaved(nextSaved);
+    try {
+      if (nextSaved) {
+        await postApi.savePost(post.id);
+      } else {
+        await postApi.unsavePost(post.id);
+      }
+    } catch (error: any) {
+      setSaved(!nextSaved);
+      Alert.alert('Error', error.message || 'Failed to update saved post');
+    }
+  };
 
   return (
     <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
@@ -97,6 +121,7 @@ export default function PartnerPostCard({
             onPress={(e) => {
               // Stop card press from firing
               e.stopPropagation?.();
+              inlineRepliesRef.current?.openReply();
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -108,12 +133,24 @@ export default function PartnerPostCard({
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={onSave}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              handleSaveToggle();
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Bookmark size={18} color={colors.onSurfaceVariant} />
-            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
-              Save
+            <Bookmark
+              size={18}
+              color={saved ? colors.primary : colors.onSurfaceVariant}
+              fill={saved ? colors.primary : 'none'}
+            />
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: saved ? colors.primary : colors.onSurfaceVariant, marginLeft: spacing.xs },
+              ]}
+            >
+              {saved ? 'Saved' : 'Save'}
             </Text>
           </TouchableOpacity>
 
@@ -130,7 +167,7 @@ export default function PartnerPostCard({
         </View>
 
         {/* ── Inline Replies (Facebook-style) ── */}
-        <InlineReplies postId={post.id} />
+        <InlineReplies ref={inlineRepliesRef} postId={post.id} />
       </Card>
       </View>
     </TouchableOpacity>

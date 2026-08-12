@@ -8,6 +8,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Animated, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Search, PenSquare, Mail, User } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -105,6 +106,7 @@ const AnimatedTabIcon = ({ focused, routeName, colors, typography }) => {
 
 export default function TabNavigator() {
   const { colors, typography, sizes } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -115,8 +117,8 @@ export default function TabNavigator() {
           borderTopWidth: 1,
           borderTopColor: colors.surfaceVariant,
           backgroundColor: colors.surfaceContainerLow,
-          height: sizes.tabBarHeight,
-          paddingBottom: 8,
+          height: sizes.tabBarHeight + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
           // Ambient shadow
           shadowColor: '#000000',

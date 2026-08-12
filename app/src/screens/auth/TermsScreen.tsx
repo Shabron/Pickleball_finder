@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Check, ShieldAlert, ShieldCheck, UserCheck, Eye, ArrowRight, X } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
+import Header from '../../components/common/Header';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
@@ -59,26 +60,31 @@ export default function TermsScreen({ route, navigation }: any) {
     });
   };
 
-  const handleClose = () => {
-    navigation.goBack();
-  };
+  const isStandaloneView = !token || !userData;
 
   return (
     <ScreenWrapper>
+      {isStandaloneView && (
+        <Header title="Terms & Conditions" showBack onBack={() => navigation.goBack()} />
+      )}
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.container}>
           {/* Header Area */}
           <View style={styles.header}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            {!isStandaloneView && (
+              <Image
+                source={require('../../assets/images/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            )}
             <Text style={[typography.headlineMedium, styles.title, { color: '#0F2C4C' }]}>
               Community Standards
             </Text>
             <Text style={[typography.bodyMedium, styles.subtitle]}>
-              Please review and accept our guidelines to join.
+              {isStandaloneView
+                ? 'Please review our community guidelines.'
+                : 'Please review and accept our guidelines to join.'}
             </Text>
           </View>
 
@@ -166,33 +172,24 @@ export default function TermsScreen({ route, navigation }: any) {
             )}
 
             {/* Action Buttons */}
-            <View style={styles.buttonContainer}>
-              {token && userData ? (
-                <>
-                  <Button
-                    title="CANCEL"
-                    onPress={handleCancel}
-                    variant="outline"
-                    style={styles.cancelButton}
-                    textStyle={{ fontWeight: 'bold' }}
-                  />
-                  <Button
-                    title="ACCEPT & JOIN"
-                    onPress={handleAccept}
-                    disabled={!accepted}
-                    style={styles.acceptButton}
-                    textStyle={{ fontWeight: 'bold' }}
-                  />
-                </>
-              ) : (
+            {!isStandaloneView && (
+              <View style={styles.buttonContainer}>
                 <Button
-                  title="CLOSE"
-                  onPress={handleClose}
-                  style={{ flex: 1 }}
+                  title="CANCEL"
+                  onPress={handleCancel}
+                  variant="outline"
+                  style={styles.cancelButton}
                   textStyle={{ fontWeight: 'bold' }}
                 />
-              )}
-            </View>
+                <Button
+                  title="ACCEPT & JOIN"
+                  onPress={handleAccept}
+                  disabled={!accepted}
+                  style={styles.acceptButton}
+                  textStyle={{ fontWeight: 'bold' }}
+                />
+              </View>
+            )}
           </Card>
         </View>
       </SafeAreaView>

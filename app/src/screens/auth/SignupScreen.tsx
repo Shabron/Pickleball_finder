@@ -203,7 +203,10 @@ export default function SignupScreen({ navigation }: any) {
             />
 
             {/* ─── Footer ─── */}
-            <TouchableOpacity style={styles.footerLink}>
+            <TouchableOpacity
+              style={styles.footerLink}
+              onPress={() => Linking.openURL('mailto:shauryamspp@gmail.com').catch(err => console.error(err))}
+            >
               <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Senior Support</Text>
             </TouchableOpacity>
           </View>

@@ -5,7 +5,23 @@
       "Bash(pod --version)",
       "Bash(pod install *)",
       "Bash(/usr/libexec/PlistBuddy -c \"Print :BUNDLE_ID\" ios/PickleballApp/GoogleService-Info.plist)",
-      "Bash(/usr/libexec/PlistBuddy -c \"Print\" PickleballApp/GoogleService-Info.plist)"
+      "Bash(/usr/libexec/PlistBuddy -c \"Print\" PickleballApp/GoogleService-Info.plist)",
+      "Bash(./gradlew clean *)",
+      "Bash(./gradlew bundleRelease)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" --max-time 10 https://pickleball-finder.onrender.com/api)",
+      "Bash(curl -s --max-time 10 https://pickleball-finder.onrender.com/api/auth/signup -X POST -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(time curl -s -o /dev/null -w \"HTTP %{http_code} time_total=%{time_total}s\\\\n\" --max-time 60 https://pickleball-finder.onrender.com/api/auth/signup -X POST -H \"Content-Type: application/json\" -d '{\"name\":\"test\",\"email\":\"test@test.com\",\"password\":\"test1234\"}')",
+      "Bash(git check-ignore *)",
+      "Bash(git -C /Users/impatidar/IdeaProjects/Pickleball_finder log -p --follow -- app/.env)",
+      "Bash(adb devices *)",
+      "Bash(adb shell *)",
+      "Bash(adb start-server *)",
+      "Bash(grep -E \"backend/\\\\.env$\")",
+      "Bash(timeout 10 adb shell ping -c 2 pickleball-finder.onrender.com)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(echo \"EXIT_CODE:$?\")",
+      "Bash(emulator -list-avds)",
+      "Bash(adb emu *)"
     ],
     "additionalDirectories": [
       "/Users/impatidar/Library/Developer/Xcode/DerivedData"

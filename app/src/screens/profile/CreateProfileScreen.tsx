@@ -30,6 +30,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { profileApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { US_STATES } from '../../constants/states';
+import { DAYPART_PRESETS } from '../../constants/availability';
 
 const SKILL_OPTIONS = [
   { label: 'Beginner (1.0 - 2.5)', value: 'beginner' },
@@ -44,35 +46,6 @@ const PLAY_STYLE_OPTIONS = [
   { label: 'Doubles', value: 'doubles' },
   { label: 'Mixed Doubles', value: 'mixed' },
   { label: 'Any / All Types', value: 'any' },
-];
-
-const US_STATES = [
-  { label: 'Alabama', value: 'AL' }, { label: 'Alaska', value: 'AK' },
-  { label: 'Arizona', value: 'AZ' }, { label: 'Arkansas', value: 'AR' },
-  { label: 'California', value: 'CA' }, { label: 'Colorado', value: 'CO' },
-  { label: 'Connecticut', value: 'CT' }, { label: 'Delaware', value: 'DE' },
-  { label: 'Florida', value: 'FL' }, { label: 'Georgia', value: 'GA' },
-  { label: 'Hawaii', value: 'HI' }, { label: 'Idaho', value: 'ID' },
-  { label: 'Illinois', value: 'IL' }, { label: 'Indiana', value: 'IN' },
-  { label: 'Iowa', value: 'IA' }, { label: 'Kansas', value: 'KS' },
-  { label: 'Kentucky', value: 'KY' }, { label: 'Louisiana', value: 'LA' },
-  { label: 'Maine', value: 'ME' }, { label: 'Maryland', value: 'MD' },
-  { label: 'Massachusetts', value: 'MA' }, { label: 'Michigan', value: 'MI' },
-  { label: 'Minnesota', value: 'MN' }, { label: 'Mississippi', value: 'MS' },
-  { label: 'Missouri', value: 'MO' }, { label: 'Montana', value: 'MT' },
-  { label: 'Nebraska', value: 'NE' }, { label: 'Nevada', value: 'NV' },
-  { label: 'New Hampshire', value: 'NH' }, { label: 'New Jersey', value: 'NJ' },
-  { label: 'New Mexico', value: 'NM' }, { label: 'New York', value: 'NY' },
-  { label: 'North Carolina', value: 'NC' }, { label: 'North Dakota', value: 'ND' },
-  { label: 'Ohio', value: 'OH' }, { label: 'Oklahoma', value: 'OK' },
-  { label: 'Oregon', value: 'OR' }, { label: 'Pennsylvania', value: 'PA' },
-  { label: 'Rhode Island', value: 'RI' }, { label: 'South Carolina', value: 'SC' },
-  { label: 'South Dakota', value: 'SD' }, { label: 'Tennessee', value: 'TN' },
-  { label: 'Texas', value: 'TX' }, { label: 'Utah', value: 'UT' },
-  { label: 'Vermont', value: 'VT' }, { label: 'Virginia', value: 'VA' },
-  { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
-  { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
-  { label: 'District of Columbia', value: 'DC' },
 ];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -134,6 +107,21 @@ export default function CreateProfileScreen({ navigation }: any) {
         },
       },
     }));
+  };
+
+  // Merges the preset's days/times into the existing schedule instead of
+  // replacing it, so multiple dayparts (e.g. Weekday Morning + Weekend Evening)
+  // can be combined on top of each other and on top of manual edits below.
+  const applyDaypartPreset = (presetKey: string) => {
+    const preset = DAYPART_PRESETS.find((p) => p.key === presetKey);
+    if (!preset) return;
+    setProfile((prev) => {
+      const avail = { ...prev.availability };
+      preset.days.forEach((d) => {
+        avail[d] = { start: preset.start, end: preset.end };
+      });
+      return { ...prev, availability: avail };
+    });
   };
 
   const applyPreset = (preset: string) => {
@@ -313,22 +301,49 @@ export default function CreateProfileScreen({ navigation }: any) {
 
               {/* ─── Quick Presets ─── */}
               <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>
-                Quick Select
+                Presets
               </Text>
               <View style={styles.presetGrid}>
-                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekdays_evening')}>
-                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekday Evenings</Text>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('weekdays_evening')}>
+                  <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Weekday Evenings</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('weekends')}>
-                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Weekends</Text>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('weekends')}>
+                  <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Weekends</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.secondaryContainer }]} onPress={() => applyPreset('any')}>
-                  <Text style={[typography.labelMedium, { color: colors.onSecondaryContainer }]}>Any Time</Text>
+                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.primary }]} onPress={() => applyPreset('any')}>
+                  <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>Any Time</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.surfaceContainerHigh }]} onPress={() => applyPreset('clear')}>
-                  <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>Clear All</Text>
+                <TouchableOpacity
+                  style={[styles.presetChip, styles.presetChipOutline, { backgroundColor: colors.surface, borderColor: colors.outline }]}
+                  onPress={() => applyPreset('clear')}
+                >
+                  <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, fontWeight: '600' }]}>Clear All</Text>
                 </TouchableOpacity>
               </View>
+
+              <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
+                By Time of Day
+              </Text>
+              {(['Weekday', 'Weekend'] as const).map((group) => (
+                <View key={group} style={{ marginBottom: spacing.md }}>
+                  <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+                    {group}
+                  </Text>
+                  <View style={styles.presetGrid}>
+                    {DAYPART_PRESETS.filter((p) => p.group === group).map((preset) => (
+                      <TouchableOpacity
+                        key={preset.key}
+                        style={[styles.presetChip, { backgroundColor: colors.secondary }]}
+                        onPress={() => applyDaypartPreset(preset.key)}
+                      >
+                        <Text style={[typography.labelMedium, { color: colors.onSecondary, fontWeight: '700' }]}>
+                          {preset.shortLabel}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
 
               <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xl, opacity: 0.3 }} />
 
@@ -475,6 +490,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  presetChipOutline: {
+    borderWidth: 1.5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   dayRow: {
     flexDirection: 'row',
