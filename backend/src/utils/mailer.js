@@ -1,26 +1,24 @@
 /**
- * mailer.js
+ * mailer.js — Email sending strategy (priority order):
  *
- * Strategy:
- *  1. If RESEND_API_KEY is set → use Resend (HTTP API, works on Render free tier, no SMTP needed).
- *  2. Otherwise → fall back to nodemailer SMTP with explicit timeouts and diagnostic logging.
+ *  1. SENDGRID_API_KEY → SendGrid Web API (HTTPS, no domain needed, just verify sender email)
+ *  2. RESEND_API_KEY   → Resend HTTP API (HTTPS, but requires verified domain for external recipients)
+ *  3. Fallback         → nodemailer SMTP (BLOCKED on Render free/starter — will timeout)
  *
- * WHY Resend?
- *  Render (free/starter) blocks outbound SMTP on ports 25, 465 and 587. Any SMTP-based
- *  approach (Gmail, SendGrid SMTP, etc.) will always time out. Resend uses HTTPS so it
- *  is never blocked.
- *
- * Setup:
- *  1. Sign up at https://resend.com (free — 3,000 emails/month, 100/day)
- *  2. Add a sending domain OR use the sandbox address (only sends to your verified email).
- *  3. Create an API key and add RESEND_API_KEY=re_xxxx to your Render env vars.
- *  4. Set EMAIL_FROM to a verified sender address, e.g. "Pickleball Finder <noreply@yourdomain.com>"
- *     (or your verified email if using the sandbox).
+ * Recommended for Render without a domain:
+ *   → Use SendGrid. Sign up at https://sendgrid.com (free, 100 emails/day).
+ *     Verify your sender email (shauryamspp@gmail.com) under Settings → Sender Authentication.
+ *     Create an API key and add SENDGRID_API_KEY=SG.xxx to Render env vars.
  */
 
 const nodemailer = require('nodemailer');
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Email templates ────────────────────────────────────────────────────────
+
+const emailSubject = 'Your Pickleball Finder password reset code';
+
+const emailText = (code) =>
+  `Your password reset code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`;
 
 const emailHtml = (code) => `
   <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
@@ -31,10 +29,29 @@ const emailHtml = (code) => `
   </div>
 `;
 
-const emailText = (code) =>
-  `Your password reset code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`;
+// ─── 1. SendGrid (recommended — no domain needed, just verify sender email) ──
 
-// ─── Resend (HTTP) ───────────────────────────────────────────────────────────
+const sendViaSendGrid = async (to, code) => {
+  const sgMail = require('@sendgrid/mail');
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  console.log(`[mailer/sendgrid] Sending to ${to} from ${from}`);
+
+  const msg = {
+    to,
+    from,   // Must match the verified sender email in your SendGrid account
+    subject: emailSubject,
+    text: emailText(code),
+    html: emailHtml(code),
+  };
+
+  const [response] = await sgMail.send(msg);
+  console.log(`[mailer/sendgrid] Accepted — statusCode: ${response.statusCode}, messageId: ${response.headers['x-message-id']}`);
+  return response;
+};
+
+// ─── 2. Resend (requires verified domain for external recipients) ─────────────
 
 const sendViaResend = async (to, code) => {
   const { Resend } = require('resend');
@@ -42,25 +59,26 @@ const sendViaResend = async (to, code) => {
 
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   console.log(`[mailer/resend] Sending to ${to} from ${from}`);
+  console.log('[mailer/resend] NOTE: Resend sandbox only allows sending TO your verified email. Verify a domain at resend.com/domains to send to all users.');
 
   const { data, error } = await resend.emails.send({
     from,
     to,
-    subject: 'Your Pickleball Finder password reset code',
+    subject: emailSubject,
     text: emailText(code),
     html: emailHtml(code),
   });
 
   if (error) {
-    console.error('[mailer/resend] API returned error:', JSON.stringify(error));
+    console.error('[mailer/resend] API error:', JSON.stringify(error));
     throw new Error(`Resend error: ${error.message || JSON.stringify(error)}`);
   }
 
-  console.log(`[mailer/resend] Email sent — id: ${data?.id}`);
+  console.log(`[mailer/resend] Sent — id: ${data?.id}`);
   return data;
 };
 
-// ─── nodemailer SMTP (fallback) ──────────────────────────────────────────────
+// ─── 3. SMTP fallback (blocked on Render — use only locally) ─────────────────
 
 let _smtpTransporter = null;
 
@@ -70,37 +88,28 @@ const getSmtpTransporter = () => {
   const config = {
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: Number(process.env.EMAIL_PORT) || 587,
-    secure: false,            // STARTTLS on 587
-    family: 4,                // Force IPv4 (avoid IPv6 ENETUNREACH on Render)
-    connectionTimeout: 10000, // 10 s — fail fast instead of hanging
-    socketTimeout: 10000,     // 10 s socket idle timeout
-    greetingTimeout: 10000,   // 10 s SMTP greeting timeout
+    secure: false,
+    family: 4,
+    connectionTimeout: 10000,
+    socketTimeout: 10000,
+    greetingTimeout: 10000,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
   };
 
   console.log('[mailer/smtp] Creating transporter:', {
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    family: config.family,
-    user: config.auth.user,
-    pass: config.auth.pass ? '(set)' : '(MISSING — check EMAIL_PASS env var)',
+    host: config.host, port: config.port, user: config.auth.user,
+    pass: config.auth.pass ? '(set)' : '(MISSING)',
   });
 
   _smtpTransporter = nodemailer.createTransport(config);
 
-  // Non-blocking connection check — result appears in logs before any send attempt
   _smtpTransporter.verify((err) => {
     if (err) {
-      console.error('[mailer/smtp] verify() FAILED — SMTP is likely blocked by host:', {
-        code: err.code,
-        syscall: err.syscall,
-        address: err.address,
-        port: err.port,
-        message: err.message,
+      console.error('[mailer/smtp] verify() FAILED — port likely blocked by host:', {
+        code: err.code, syscall: err.syscall, address: err.address, message: err.message,
       });
     } else {
-      console.log('[mailer/smtp] verify() OK — SMTP connection is open and ready');
+      console.log('[mailer/smtp] verify() OK — SMTP ready');
     }
   });
 
@@ -110,32 +119,32 @@ const getSmtpTransporter = () => {
 const sendViaSmtp = async (to, code) => {
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   console.log(`[mailer/smtp] Sending to ${to} from ${from}`);
-  console.log('[mailer/smtp] Calling sendMail — will log result or error below...');
 
   const info = await getSmtpTransporter().sendMail({
-    from,
-    to,
-    subject: 'Your Pickleball Finder password reset code',
-    text: emailText(code),
-    html: emailHtml(code),
+    from, to, subject: emailSubject, text: emailText(code), html: emailHtml(code),
   });
 
-  console.log(`[mailer/smtp] Accepted by server — messageId: ${info.messageId}, response: ${info.response}`);
+  console.log(`[mailer/smtp] Accepted — messageId: ${info.messageId}, response: ${info.response}`);
   return info;
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 const sendPasswordResetEmail = async (to, code) => {
+  if (process.env.SENDGRID_API_KEY) {
+    console.log('[mailer] Using SendGrid HTTP API (no domain required)');
+    return sendViaSendGrid(to, code);
+  }
+
   if (process.env.RESEND_API_KEY) {
-    console.log('[mailer] RESEND_API_KEY found → using Resend HTTP API (recommended for Render)');
+    console.log('[mailer] Using Resend HTTP API (domain required for external recipients)');
     return sendViaResend(to, code);
   }
 
   console.warn(
-    '[mailer] RESEND_API_KEY not set → falling back to SMTP. ' +
-    'WARNING: Render free/starter tier blocks outbound SMTP — this will likely time out. ' +
-    'Set RESEND_API_KEY in your Render env vars to fix this.'
+    '[mailer] No SENDGRID_API_KEY or RESEND_API_KEY set. ' +
+    'Falling back to SMTP — this will TIMEOUT on Render free/starter tier. ' +
+    'Set SENDGRID_API_KEY in your Render environment variables to fix this.'
   );
   return sendViaSmtp(to, code);
 };
