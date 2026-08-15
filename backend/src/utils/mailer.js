@@ -5,17 +5,13 @@ let transporter;
 const getTransporter = () => {
   if (transporter) return transporter;
 
-  const config = process.env.EMAIL_SERVICE
-    ? {
-        service: process.env.EMAIL_SERVICE,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      }
-    : {
-        host: process.env.EMAIL_HOST,
-        port: Number(process.env.EMAIL_PORT) || 587,
-        secure: Number(process.env.EMAIL_PORT) === 465,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      };
+  const config = {
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT) || 587,
+    secure: false,          // STARTTLS on 587 — do NOT use SSL/465 (blocked on Render)
+    family: 4,              // Force IPv4 — Render's IPv6 routing is unreliable
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  };
 
   console.log('[mailer] Creating SMTP transporter with config:', {
     ...config,
