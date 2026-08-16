@@ -38,16 +38,37 @@ const sendViaSendGrid = async (to, code) => {
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   console.log(`[mailer/sendgrid] Sending to ${to} from ${from}`);
 
-  const [response] = await sgMail.send({
-    to,
-    from,   // Must match the verified sender email in your SendGrid account
-    subject: emailSubject,
-    text: emailText(code),
-    html: emailHtml(code),
-  });
+  try {
+    const [response] = await sgMail.send({
+      to,
+      from,   // Must match the verified sender email in your SendGrid account
+      subject: emailSubject,
+      text: emailText(code),
+      html: emailHtml(code),
+    });
 
-  console.log(`[mailer/sendgrid] Accepted — statusCode: ${response.statusCode}, messageId: ${response.headers['x-message-id']}`);
-  return response;
+    console.log(`[mailer/sendgrid] Accepted — statusCode: ${response.statusCode}, messageId: ${response.headers['x-message-id']}`);
+    return response;
+  } catch (err) {
+    // SendGrid buries the actual reason in response.body.errors, which Node's
+    // default logging collapses to "[Array]" — surface it so failures are
+    // diagnosable (403 almost always means `from` is not a verified sender).
+    const errors = err.response?.body?.errors;
+    if (errors) {
+      console.error(
+        `[mailer/sendgrid] REJECTED (${err.code}) sending from "${from}":`,
+        JSON.stringify(errors, null, 2)
+      );
+      if (err.code === 403) {
+        console.error(
+          `[mailer/sendgrid] A 403 here means "${from}" is not a verified sender. ` +
+          'Verify it at SendGrid → Settings → Sender Authentication → Single Sender ' +
+          'Verification, and make sure EMAIL_FROM matches that exact address.'
+        );
+      }
+    }
+    throw err;
+  }
 };
 
 // ─── 2. SMTP fallback (blocked on Render — use only locally) ─────────────────
