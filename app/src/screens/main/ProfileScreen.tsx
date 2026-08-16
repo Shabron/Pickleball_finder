@@ -124,12 +124,12 @@ export default function ProfileScreen({ navigation }: any) {
     {
       icon: <Shield size={sizes.iconSmall} color={colors.primary} />,
       label: 'Privacy Policy',
-      onPress: () => navigation.navigate('PrivacyPolicy'),
+      onPress: () => navigation.navigate('PrivacyPolicyInfo'),
     },
     {
       icon: <FileText size={sizes.iconSmall} color={colors.secondary} />,
       label: 'Terms & Conditions',
-      onPress: () => navigation.navigate('Terms'),
+      onPress: () => navigation.navigate('TermsInfo'),
     },
     {
       icon: <Info size={sizes.iconSmall} color={colors.onSurfaceVariant} />,

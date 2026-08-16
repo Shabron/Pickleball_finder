@@ -63,11 +63,12 @@ export default function AppNavigator() {
     <NavigationContainer ref={navigationRef}>
       {isLoading ? (
         // Show spinner inside the single container while bootstrapping
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator key="loading" screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Splash" component={SplashScreen} />
         </Stack.Navigator>
       ) : !isAuthenticated ? (
-        <Stack.Navigator 
+        <Stack.Navigator
+          key="guest"
           initialRouteName={pendingTerms ? "Terms" : "Welcome"}
           screenOptions={{ headerShown: false }}
         >
@@ -85,7 +86,7 @@ export default function AppNavigator() {
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       ) : (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator key="app" screenOptions={{ headerShown: false }}>
           {isNewSignup ? (
             <>
               {/* Onboarding first */}
@@ -111,8 +112,15 @@ export default function AppNavigator() {
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
           <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
-          <Stack.Screen name="Terms" component={TermsScreen} />
-          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+          {/*
+            NOTE: these MUST NOT reuse the guest stack's "Terms"/"PrivacyPolicy"
+            route names. NavigationContainer preserves navigation state when the
+            stack is swapped on auth change — a duplicate route name causes it to
+            rehydrate onto that screen instead of starting at CreateProfile,
+            which silently strands the user on Terms after "Accept & Join".
+          */}
+          <Stack.Screen name="TermsInfo" component={TermsScreen} />
+          <Stack.Screen name="PrivacyPolicyInfo" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       )}
     </NavigationContainer>

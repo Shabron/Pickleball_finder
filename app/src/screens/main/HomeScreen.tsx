@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { postApi, messageApi, profileApi } from '../../services/api';
+import { ensurePushRegistration } from '../../services/push';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -41,6 +42,12 @@ export default function HomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+
+  // Ask for notification permission here — once the user has actually reached the
+  // dashboard — rather than interrupting the signup flow with an OS dialog.
+  useEffect(() => {
+    ensurePushRegistration();
+  }, []);
 
   // Fetch unread notifications count and saved post ids whenever home is focused
   useFocusEffect(

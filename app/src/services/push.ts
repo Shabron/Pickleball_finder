@@ -6,12 +6,15 @@
  * FCM does not auto-display a notification while the app is foregrounded).
  */
 import { Platform, PermissionsAndroid } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { userApi } from './api';
 import { navigationRef } from '../navigation/navigationRef';
 
 const ANDROID_CHANNEL_ID = 'default';
+/** Set once we've shown the OS permission prompt, so we never nag again. */
+const PUSH_PROMPT_KEY = '@push_permission_prompted';
 
 const ensureAndroidChannel = async () => {
   if (Platform.OS !== 'android') return;
@@ -63,6 +66,31 @@ export const registerPushToken = async (): Promise<void> => {
     await userApi.registerPushToken(token, Platform.OS as 'ios' | 'android');
   } catch (error) {
     console.error('[push] Failed to register push token:', error);
+  }
+};
+
+/**
+ * Asks for notification permission at most once per install, then registers the
+ * push token. Call this from the dashboard — NOT during signup, where an OS
+ * dialog interrupts the flow and pauses the Activity mid screen-transition.
+ */
+export const ensurePushRegistration = async (): Promise<void> => {
+  try {
+    // Already granted — nothing to prompt, just refresh the token.
+    if (await hasNotificationPermission()) {
+      await registerPushToken();
+      return;
+    }
+
+    // Only ever prompt once; re-prompting on every dashboard visit is nagging.
+    if (await AsyncStorage.getItem(PUSH_PROMPT_KEY)) return;
+    await AsyncStorage.setItem(PUSH_PROMPT_KEY, 'true');
+
+    const granted = await requestNotificationPermission();
+    if (granted) await registerPushToken();
+  } catch (error) {
+    // Permission/registration failures are non-fatal — never block the UI.
+    console.error('[push] ensurePushRegistration failed:', error);
   }
 };
 

@@ -17,7 +17,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, setToken, clearToken } from '../services/api';
-import { requestNotificationPermission, registerPushToken, unregisterPushToken } from '../services/push';
+import { registerPushToken, unregisterPushToken } from '../services/push';
 
 interface User {
   _id: string;
@@ -77,6 +77,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.success && res.data) {
           setUser(res.data);
           setIsAuthenticated(true);
+          // If the account never finished profile creation (e.g. the app was
+          // closed mid-onboarding, right after signup), resume onboarding
+          // instead of dropping the user straight into the main app.
+          if (!res.data.profileComplete) {
+            setIsNewSignup(true);
+          }
           // Re-register the push token in case it changed since the last
           // session (no-ops silently if permission was never granted).
           registerPushToken();
@@ -102,10 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsNewSignup(isSignup);
     setIsAuthenticated(true);
 
-    // Ask for notification permission right after a fresh login/signup,
-    // then register the device's push token if granted.
-    const granted = await requestNotificationPermission();
-    if (granted) registerPushToken();
+    // NOTE: the notification permission prompt deliberately does NOT run here.
+    // Interrupting signup with an OS dialog is poor UX, and pausing the Activity
+    // mid-transition made the Terms screen appear frozen. HomeScreen asks once
+    // the user actually reaches the dashboard instead — see ensurePushRegistration().
   }, []);
 
   const logout = useCallback(async () => {
