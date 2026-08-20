@@ -20,6 +20,8 @@ import {
 import { ChevronLeft, Send, MoreVertical } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Avatar from '../../components/common/Avatar';
+import ReportBlockSheet from '../../components/ReportBlockSheet';
+import RatingSheet from '../../components/RatingSheet';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { messageApi } from '../../services/api';
@@ -48,6 +50,8 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   const [inputText, setInputText] = useState('');
   const [convStatus, setConvStatus] = useState<string>('accepted');
   const [initiator, setInitiator] = useState<string>('');
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showRatingSheet, setShowRatingSheet] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { colors, typography } = useTheme();
 
@@ -181,6 +185,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
 
           <TouchableOpacity
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={() => setShowActionSheet(true)}
           >
             <MoreVertical color={colors.onSurfaceVariant} size={sizes.iconDefault} />
           </TouchableOpacity>
@@ -240,6 +245,27 @@ export default function ChatThreadScreen({ navigation, route }: any) {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {partnerId && (
+        <>
+          <ReportBlockSheet
+            visible={showActionSheet}
+            userId={partnerId}
+            userName={partnerName}
+            context="chat"
+            onClose={() => setShowActionSheet(false)}
+            onBlocked={() => navigation.goBack()}
+            onRate={convStatus === 'accepted' ? () => setShowRatingSheet(true) : undefined}
+          />
+          <RatingSheet
+            visible={showRatingSheet}
+            userId={partnerId}
+            userName={partnerName}
+            conversationId={conversationId}
+            onClose={() => setShowRatingSheet(false)}
+          />
+        </>
+      )}
     </ScreenWrapper>
   );
 }

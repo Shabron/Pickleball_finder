@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { signup, login, forgotPassword, resetPassword, getMe, deleteMe } = require('../controllers/authController');
+const { signup, login, forgotPassword, resetPassword, getMe, deleteMe, sendEmailVerification, confirmEmailVerification } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 // POST /api/auth/signup
@@ -20,5 +20,11 @@ router.post('/reset-password', resetPassword);
 
 // DELETE /api/auth/delete — delete account and data
 router.delete('/delete', protect, deleteMe);
+
+// POST /api/auth/verify-email/send — send (or resend) an email verification code
+router.post('/verify-email/send', protect, sendEmailVerification);
+
+// POST /api/auth/verify-email/confirm — confirm the emailed verification code
+router.post('/verify-email/confirm', protect, confirmEmailVerification);
 
 module.exports = router;

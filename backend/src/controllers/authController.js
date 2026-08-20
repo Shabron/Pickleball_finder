@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { sendPasswordResetEmail } = require('../utils/mailer');
+const { sendPasswordResetEmail, sendVerificationEmail } = require('../utils/mailer');
 const Profile = require('../models/Profile');
 const Post = require('../models/Post');
 const Reply = require('../models/Reply');
@@ -14,6 +14,16 @@ const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d',
   });
+};
+
+// Generate + store a hashed 6-digit code on the user, then email it.
+// Shared by signup's auto-send and the explicit resend endpoint.
+const issueVerificationCode = async (user) => {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  user.emailVerificationToken = crypto.createHash('sha256').update(code).digest('hex');
+  user.emailVerificationExpire = Date.now() + 10 * 60 * 1000;
+  await user.save({ validateBeforeSave: false });
+  await sendVerificationEmail(user.email, code);
 };
 
 // @desc    Register a new user
@@ -54,6 +64,11 @@ const signup = async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    // Fire-and-forget — don't block signup on email delivery.
+    issueVerificationCode(user).catch((err) =>
+      console.error(`[signup] Failed to send verification email to ${user.email}:`, err)
+    );
 
     res.status(201).json({
       success: true,
@@ -221,6 +236,54 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// @desc    Send (or resend) an email verification code
+// @route   POST /api/auth/verify-email/send
+// @access  Private
+const sendEmailVerification = async (req, res) => {
+  try {
+    if (req.user.emailVerified) {
+      return res.status(200).json({ success: true, message: 'Email already verified' });
+    }
+
+    await issueVerificationCode(req.user);
+
+    res.status(200).json({ success: true, message: 'A verification code has been sent to your email.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to send verification email. Please try again later.' });
+  }
+};
+
+// @desc    Confirm the emailed verification code
+// @route   POST /api/auth/verify-email/confirm
+// @access  Private
+const confirmEmailVerification = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Please provide the verification code' });
+    }
+
+    const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+
+    if (
+      req.user.emailVerificationToken !== hashedCode ||
+      !req.user.emailVerificationExpire ||
+      req.user.emailVerificationExpire < Date.now()
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+    }
+
+    req.user.emailVerified = true;
+    req.user.emailVerificationToken = undefined;
+    req.user.emailVerificationExpire = undefined;
+    await req.user.save({ validateBeforeSave: false });
+
+    res.status(200).json({ success: true, message: 'Email verified' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get current logged in user
 // @route   GET /api/auth/me
 // @access  Private
@@ -234,6 +297,7 @@ const getMe = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        emailVerified: user.emailVerified,
         profileComplete: profile ? profile.profileComplete : false,
       },
     });
@@ -289,4 +353,4 @@ const deleteMe = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, forgotPassword, resetPassword, getMe, deleteMe };
+module.exports = { signup, login, forgotPassword, resetPassword, getMe, deleteMe, sendEmailVerification, confirmEmailVerification };

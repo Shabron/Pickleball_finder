@@ -15,12 +15,12 @@ const nodemailer = require('nodemailer');
 
 // ─── Email templates ────────────────────────────────────────────────────────
 
-const emailSubject = 'Your Pickleball Finder password reset code';
+const resetSubject = 'Your Pickleball Finder password reset code';
 
-const emailText = (code) =>
+const resetText = (code) =>
   `Your password reset code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`;
 
-const emailHtml = (code) => `
+const resetHtml = (code) => `
   <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
     <h2 style="color:#0F2C4C;">Reset your password</h2>
     <p>Use the code below to reset your Pickleball Finder password. It expires in 10 minutes.</p>
@@ -29,9 +29,23 @@ const emailHtml = (code) => `
   </div>
 `;
 
+const verifySubject = 'Verify your Pickleball Finder email';
+
+const verifyText = (code) =>
+  `Your email verification code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`;
+
+const verifyHtml = (code) => `
+  <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+    <h2 style="color:#0F2C4C;">Verify your email</h2>
+    <p>Use the code below to verify your Pickleball Finder account. It expires in 10 minutes.</p>
+    <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; background:#F3F4F6; padding:16px 24px; border-radius:8px; text-align:center; margin: 24px 0;">${code}</div>
+    <p style="color:#6B7280; font-size: 14px;">If you didn't create this account, you can safely ignore this email.</p>
+  </div>
+`;
+
 // ─── 1. SendGrid (recommended — no domain needed, just verify sender email) ──
 
-const sendViaSendGrid = async (to, code) => {
+const sendViaSendGrid = async (to, subject, text, html) => {
   const sgMail = require('@sendgrid/mail');
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -42,9 +56,9 @@ const sendViaSendGrid = async (to, code) => {
     const [response] = await sgMail.send({
       to,
       from,   // Must match the verified sender email in your SendGrid account
-      subject: emailSubject,
-      text: emailText(code),
-      html: emailHtml(code),
+      subject,
+      text,
+      html,
     });
 
     console.log(`[mailer/sendgrid] Accepted — statusCode: ${response.statusCode}, messageId: ${response.headers['x-message-id']}`);
@@ -109,12 +123,12 @@ const getSmtpTransporter = () => {
   return _smtpTransporter;
 };
 
-const sendViaSmtp = async (to, code) => {
+const sendViaSmtp = async (to, subject, text, html) => {
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   console.log(`[mailer/smtp] Sending to ${to} from ${from}`);
 
   const info = await getSmtpTransporter().sendMail({
-    from, to, subject: emailSubject, text: emailText(code), html: emailHtml(code),
+    from, to, subject, text, html,
   });
 
   console.log(`[mailer/smtp] Accepted — messageId: ${info.messageId}, response: ${info.response}`);
@@ -123,10 +137,10 @@ const sendViaSmtp = async (to, code) => {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-const sendPasswordResetEmail = async (to, code) => {
+const sendEmail = async (to, subject, text, html) => {
   if (process.env.SENDGRID_API_KEY) {
     console.log('[mailer] Using SendGrid HTTP API');
-    return sendViaSendGrid(to, code);
+    return sendViaSendGrid(to, subject, text, html);
   }
 
   console.warn(
@@ -134,7 +148,11 @@ const sendPasswordResetEmail = async (to, code) => {
     'Falling back to SMTP — this will TIMEOUT on Render free/starter tier. ' +
     'Set SENDGRID_API_KEY in your Render environment variables to fix this.'
   );
-  return sendViaSmtp(to, code);
+  return sendViaSmtp(to, subject, text, html);
 };
 
-module.exports = { sendPasswordResetEmail };
+const sendPasswordResetEmail = (to, code) => sendEmail(to, resetSubject, resetText(code), resetHtml(code));
+
+const sendVerificationEmail = (to, code) => sendEmail(to, verifySubject, verifyText(code), verifyHtml(code));
+
+module.exports = { sendPasswordResetEmail, sendVerificationEmail };

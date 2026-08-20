@@ -1,17 +1,19 @@
 const Profile = require('../models/Profile');
 const Conversation = require('../models/Conversation');
+const User = require('../models/User');
 
 // @desc    Find nearby players (by profile location)
-// @route   GET /api/matchmaking/nearby?lat=&lng=&radiusKm=&skillLevel=&playStyle=&limit=
+// @route   GET /api/matchmaking/nearby?lat=&lng=&radiusKm=&skillLevel=&playStyle=&limit=&offset=
 // @access  Private
 const getNearbyPlayers = async (req, res) => {
   try {
-    const { lat, lng, radiusKm = '25', skillLevel, playStyle, limit = '50' } = req.query;
+    const { lat, lng, radiusKm = '25', skillLevel, playStyle, limit = '50', offset = '0' } = req.query;
 
     const latNum = Number(lat);
     const lngNum = Number(lng);
     const radiusKmNum = Number(radiusKm);
     const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
+    const offsetNum = Math.max(0, Number(offset) || 0);
 
     if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
       return res.status(400).json({ success: false, message: 'lat and lng are required and must be numbers' });
@@ -25,8 +27,13 @@ const getNearbyPlayers = async (req, res) => {
 
     const maxDistanceMeters = radiusKmNum * 1000;
 
+    // Exclude both directions: users I've blocked, and users who've blocked me.
+    const blockedByMe = req.user.blockedUsers || [];
+    const blockedMe = await User.find({ blockedUsers: req.user._id }, '_id');
+    const excludedUserIds = [req.user._id, ...blockedByMe, ...blockedMe.map((u) => u._id)];
+
     const baseQuery = {
-      user: { $ne: req.user._id },
+      user: { $nin: excludedUserIds },
     };
     if (skillLevel) baseQuery.skillLevel = skillLevel;
     if (playStyle) baseQuery.playStyle = playStyle;
@@ -43,11 +50,16 @@ const getNearbyPlayers = async (req, res) => {
         },
       },
       { $sort: { distanceMeters: 1 } },
-      { $limit: limitNum },
+      { $skip: offsetNum },
+      // Fetch one extra record to detect whether another page exists.
+      { $limit: limitNum + 1 },
     ]);
 
+    const hasMore = results.length > limitNum;
+    const page = hasMore ? results.slice(0, limitNum) : results;
+
     // Hydrate + populate user details for client display
-    const profiles = await Profile.populate(results, { path: 'user', select: 'name email avatar' });
+    const profiles = await Profile.populate(page, { path: 'user', select: 'name email avatar emailVerified' });
 
     // Fetch conversation statuses
     const profileUserIds = profiles.map(p => p.user._id);
@@ -79,6 +91,8 @@ const getNearbyPlayers = async (req, res) => {
         connectionStatus: statusMap[p.user._id.toString()] || 'none',
         conversationId: conversations.find(c => c.participants.some(par => par.toString() === p.user._id.toString()))?._id || null,
       })),
+      hasMore,
+      nextOffset: offsetNum + profiles.length,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

@@ -144,6 +144,47 @@ export const authApi = {
 
     return await response.json();
   },
+
+  sendEmailVerification: async () => {
+    const token = await getToken();
+    if (!token) throw new Error('No token stored');
+
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to send verification code');
+    }
+
+    return await response.json();
+  },
+
+  confirmEmailVerification: async (code: string) => {
+    const token = await getToken();
+    if (!token) throw new Error('No token stored');
+
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Invalid or expired code');
+    }
+
+    return await response.json();
+  },
 };
 
 export const userApi = {
@@ -536,7 +577,7 @@ export const postApi = {
 };
 
 export const matchmakingApi = {
-  getNearbyPlayers: async (params: { lat: number; lng: number; radiusKm?: number; skillLevel?: string; playStyle?: string; limit?: number }) => {
+  getNearbyPlayers: async (params: { lat: number; lng: number; radiusKm?: number; skillLevel?: string; playStyle?: string; limit?: number; offset?: number }) => {
     try {
       const token = await getToken();
       const queryParams = new URLSearchParams();
@@ -546,6 +587,7 @@ export const matchmakingApi = {
       if (params.skillLevel !== undefined) queryParams.append('skillLevel', params.skillLevel);
       if (params.playStyle !== undefined) queryParams.append('playStyle', params.playStyle);
       if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
+      if (params.offset !== undefined) queryParams.append('offset', params.offset.toString());
 
       const queryStr = queryParams.toString();
       const response = await fetch(`${API_BASE_URL}/matchmaking/nearby${queryStr ? `?${queryStr}` : ''}`, {
@@ -792,6 +834,138 @@ export const notificationApi = {
       return await response.json();
     } catch (error) {
       console.error('updateSettings error:', error);
+      throw error;
+    }
+  },
+};
+
+export const safetyApi = {
+  reportUser: async (params: { reportedUserId: string; reason: string; details?: string; context?: 'profile' | 'chat'; alsoBlock?: boolean }) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/safety/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to submit report');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('reportUser error:', error);
+      throw error;
+    }
+  },
+
+  blockUser: async (userId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/safety/block/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to block user');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('blockUser error:', error);
+      throw error;
+    }
+  },
+
+  unblockUser: async (userId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/safety/block/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to unblock user');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('unblockUser error:', error);
+      throw error;
+    }
+  },
+
+  getBlockedUsers: async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/safety/blocked`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch blocked users');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('getBlockedUsers error:', error);
+      throw error;
+    }
+  },
+};
+
+export const ratingApi = {
+  rateUser: async (userId: string, params: { stars: number; tags?: string[]; comment?: string; conversationId?: string }) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/ratings/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to submit rating');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('rateUser error:', error);
+      throw error;
+    }
+  },
+
+  getRating: async (userId: string) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/ratings/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch rating');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('getRating error:', error);
       throw error;
     }
   },

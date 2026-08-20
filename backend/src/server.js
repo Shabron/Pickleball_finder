@@ -12,6 +12,8 @@ const postRoutes = require('./routes/postRoutes');
 const matchmakingRoutes = require('./routes/matchmakingRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const safetyRoutes = require('./routes/safetyRoutes');
+const ratingRoutes = require('./routes/ratingRoutes');
 
 // Initialize app
 const app = express();
@@ -53,6 +55,8 @@ app.use('/api/posts', postRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/safety', safetyRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 // Error handling
 app.use(errorHandler);

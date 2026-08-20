@@ -3,73 +3,79 @@ import { View, StyleSheet, Text, Image, TouchableOpacity, ScrollView } from 'rea
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme/ThemeContext';
 import Button from '../../components/common/Button';
+import HeroImageSlider from '../../components/HeroImageSlider';
+import ScreenWrapper from '../../components/common/ScreenWrapper';
 import { sizes, spacing } from '../../theme/spacing';
 
 type WelcomeScreenProps = {
   navigation: NativeStackNavigationProp<any, any>;
 };
 
+const HERO_IMAGES = [
+  require('../../assets/images/background-1.png'),
+  require('../../assets/images/background-2.png'),
+  require('../../assets/images/background-3.png'),
+  require('../../assets/images/background-4.png'),
+];
+
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const { colors, typography } = useTheme();
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: '#EAF4FC' }]}
-      contentContainerStyle={[styles.contentContainer, { flexGrow: 1, justifyContent: 'space-between' }]}
-      bounces={false}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.topSection}>
-        <View style={styles.header}>
-          <Image
-            source={require('../../assets/images/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+    <ScreenWrapper backgroundColor="#EAF4FC">
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.contentContainer, { flexGrow: 1, justifyContent: 'space-between' }]}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.topSection}>
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
+          <View style={styles.imageWrapper}>
+            <HeroImageSlider images={HERO_IMAGES} />
+          </View>
         </View>
 
-        <View style={styles.imageWrapper}>
-          <Image
-            source={require('../../assets/images/bacground.png')}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-        </View>
-      </View>
+        <View style={styles.mainSection}>
+          <View style={styles.textSection}>
+            <Text style={[typography.headlineMedium, styles.title, { color: '#0F2C4C' }]}>
+              Senior Pickleball Partners
+            </Text>
+            <Text style={[typography.bodyLarge, styles.subtitle, { color: '#1B1B1B' }]}>
+              Connect with friends, find matches, and stay active.
+            </Text>
+          </View>
 
-      <View style={styles.mainSection}>
-        <View style={styles.textSection}>
-          <Text style={[typography.headlineMedium, styles.title, { color: '#0F2C4C' }]}>
-            Senior Pickleball Partners Login
+          <View style={styles.buttonSection}>
+            <Button
+              title="SIGN UP"
+              onPress={() => navigation.navigate('Signup')}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+            />
+            <Button
+              title="LOG IN"
+              onPress={() => navigation.navigate('Login')}
+              style={[styles.actionButton, { backgroundColor: colors.secondary }]}
+              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+            />
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[typography.bodyMedium, styles.tagline, { color: '#1B1B1B' }]}>
+            Connecting Competitive Seniors{'\n'}On The Tournament Circuit
           </Text>
-          <Text style={[typography.bodyLarge, styles.subtitle, { color: '#1B1B1B' }]}>
-            Connect with friends, find matches, and stay active.
-          </Text>
         </View>
-
-        <View style={styles.buttonSection}>
-          <Button
-            title="SIGN UP"
-            onPress={() => navigation.navigate('Signup')}
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
-          />
-          <Button
-            title="LOG IN"
-            onPress={() => navigation.navigate('Login')}
-            style={[styles.actionButton, { backgroundColor: colors.secondary }]}
-            textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
-          />
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={[typography.bodyMedium, styles.tagline, { color: '#1B1B1B' }]}>
-          Connecting Competitive Seniors{'\n'}On The Tournament Circuit
-        </Text>
-
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </ScreenWrapper>
   );
 }
 
@@ -87,7 +93,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: spacing.md,
-    marginBottom: -35, // Pulls the hero banner up to eliminate the massive intrinsic transparency gap
+    marginBottom: spacing.md,
     zIndex: 10,
   },
   logo: {
@@ -106,10 +112,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
   },
   mainSection: {
     flex: 1,

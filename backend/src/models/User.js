@@ -27,6 +27,16 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpire: {
       type: Date,
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+    },
+    emailVerificationExpire: {
+      type: Date,
+    },
     pushTokens: [
       {
         token: { type: String, required: true },
@@ -34,11 +44,19 @@ const userSchema = new mongoose.Schema(
         updatedAt: { type: Date, default: Date.now },
       },
     ],
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
+
+userSchema.index({ blockedUsers: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

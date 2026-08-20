@@ -20,7 +20,7 @@ import {
   Dimensions,
   ViewStyle,
 } from 'react-native';
-import { MapPin, CircleCheck, Zap } from 'lucide-react-native';
+import { MapPin, CircleCheck, Zap, Star } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../theme/spacing';
 import Avatar from './common/Avatar';
@@ -42,6 +42,9 @@ export interface PlayerProfileData {
   conversationId?: string;
   /** Approximate location, when known, for plotting on the nearby-players map */
   coordinate?: { latitude: number; longitude: number };
+  avgRating?: number;
+  ratingCount?: number;
+  emailVerified?: boolean;
 }
 
 interface PlayerProfileCardProps {
@@ -157,8 +160,20 @@ export default function PlayerProfileCard({
             {player.age}
           </Text>
         )}
-        <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
+        {player.emailVerified && (
+          <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
+        )}
       </View>
+
+      {/* ─── Rating ─── */}
+      {!!player.ratingCount && (
+        <View style={styles.ratingRow}>
+          <Star size={14} color={colors.tertiary} fill={colors.tertiary} />
+          <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: 4 }]}>
+            {player.avgRating?.toFixed(1)} ({player.ratingCount})
+          </Text>
+        </View>
+      )}
 
       {/* ─── Skill Level ─── */}
       <View style={[styles.levelChip, { backgroundColor: colors.primaryContainer }]}>
@@ -336,6 +351,11 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,

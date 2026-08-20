@@ -56,6 +56,14 @@ const profileSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    avgRating: {
+      type: Number,
+      default: 0,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+    },
     notificationSettings: {
       requests: { type: Boolean, default: true },
       messages: { type: Boolean, default: true },

@@ -2,6 +2,7 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
+const User = require('../models/User');
 const { sendPushNotification } = require('../utils/push');
 
 // @desc    Get all conversations for the logged-in user
@@ -84,6 +85,14 @@ const sendMessage = async (req, res) => {
 
     if (!receiverId || !content) {
       return res.status(400).json({ success: false, message: 'Receiver and content are required' });
+    }
+
+    const iBlockedThem = (req.user.blockedUsers || []).some((id) => id.toString() === receiverId);
+    const theyBlockedMe = iBlockedThem
+      ? false
+      : await User.exists({ _id: receiverId, blockedUsers: senderId });
+    if (iBlockedThem || theyBlockedMe) {
+      return res.status(403).json({ success: false, message: "You can't message this user." });
     }
 
     // Find existing conversation

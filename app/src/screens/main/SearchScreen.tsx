@@ -5,9 +5,9 @@
  *  - App header with logo + "Senior Pickleball Partners" branding
  *  - Nearby players section with a live MapView of approximate locations
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
- *  - onEndReached appends more mock players (simulated pagination)
+ *  - onEndReached fetches the next page of nearby players from the API
  */
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -31,137 +31,10 @@ import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// TODO: replace with the signed-in user's real (or profile-derived) location
-// once on-device location capture / profile geocoding is surfaced here too.
-const CURRENT_USER_LOCATION = { latitude: 27.9606, longitude: -82.4572 };
-
-// ─── Mock data ───────────────────────────────────────────────────────────────
-
-const INITIAL_PLAYERS: PlayerProfileData[] = [
-  {
-    id: '1',
-    name: 'Arthur S.',
-    age: 67,
-    level: '3.0',
-    distance: '1.2 mi',
-    matchScore: 92,
-    playStyle: 'Doubles / Mixed',
-    bio: 'Retired teacher who loves the game. Looking for a consistent doubles partner for weekend mornings at Riverside courts.',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/men/67.jpg',
-  },
-  {
-    id: '2',
-    name: 'Betty L.',
-    age: 63,
-    level: '3.5',
-    distance: '2.5 mi',
-    matchScore: 85,
-    playStyle: 'Singles / Doubles',
-    bio: 'Former tennis player transitioning to pickleball. I play 4× a week and love competitive but friendly matches!',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/women/52.jpg',
-  },
-  {
-    id: '3',
-    name: 'Clara M.',
-    age: 71,
-    level: '2.5',
-    distance: '0.8 mi',
-    matchScore: 78,
-    playStyle: 'Doubles',
-    bio: 'Just started playing 6 months ago. Looking for patient partners who enjoy the social side of the game.',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/71.jpg',
-  },
-  {
-    id: '4',
-    name: 'David K.',
-    age: 59,
-    level: '4.0',
-    distance: '3.1 mi',
-    matchScore: 65,
-    playStyle: 'Singles',
-    bio: 'Competitive player training for local tournaments. Looking for strong singles opponents to sharpen my game.',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/44.jpg',
-  },
-  {
-    id: '5',
-    name: 'Eleanor R.',
-    age: 68,
-    level: '3.0',
-    distance: '1.8 mi',
-    matchScore: 88,
-    playStyle: 'Doubles / Any',
-    bio: 'Love the camaraderie that comes with pickleball! Active in the senior community and always up for a match.',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/68.jpg',
-  },
-  {
-    id: '6',
-    name: 'Frank T.',
-    age: 74,
-    level: '2.0',
-    distance: '4.0 mi',
-    matchScore: 72,
-    playStyle: 'Doubles',
-    bio: 'New to the sport but very enthusiastic. My grandchildren got me into it — best decision ever!',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/74.jpg',
-  },
-];
-
-const MORE_PLAYERS: PlayerProfileData[] = [
-  {
-    id: '7',
-    name: 'Grace P.',
-    age: 61,
-    level: '3.5',
-    distance: '2.2 mi',
-    matchScore: 90,
-    playStyle: 'Doubles / Mixed',
-    bio: 'Avid player competing in regional tournaments. Seeking a dependable doubles partner with a strong net game.',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/61.jpg',
-  },
-  {
-    id: '8',
-    name: 'Harold M.',
-    age: 69,
-    level: '3.0',
-    distance: '1.5 mi',
-    matchScore: 81,
-    playStyle: 'Any',
-    bio: 'I play for fun and fitness. Rain or shine, I am at the courts three times a week.',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/69.jpg',
-  },
-  {
-    id: '9',
-    name: 'Irene C.',
-    age: 65,
-    level: '3.5',
-    distance: '3.3 mi',
-    matchScore: 76,
-    playStyle: 'Singles / Doubles',
-    bio: 'Competitive spirit, friendly heart. I love working on strategy and improving every single session.',
-    isOnline: true,
-    avatarUri: 'https://randomuser.me/api/portraits/women/65.jpg',
-  },
-  {
-    id: '10',
-    name: 'James W.',
-    age: 72,
-    level: '2.5',
-    distance: '2.9 mi',
-    matchScore: 69,
-    playStyle: 'Doubles',
-    bio: 'Enjoying retirement one pickleball match at a time. Easy-going and love meeting new players.',
-    isOnline: false,
-    avatarUri: 'https://randomuser.me/api/portraits/men/72.jpg',
-  },
-];
+// Decorative fallback only — used to center the (currently disabled) map
+// placeholder before the user's real profile location has loaded. Never
+// used for the nearby-players API call, which requires a real location.
+const DEFAULT_MAP_REGION = { latitude: 39.8283, longitude: -98.5795 };
 
 // ─── Nearby players preview (used in map placeholder) ────────────────────────
 // No real coordinate here — these are only a fallback for when the API
@@ -181,39 +54,56 @@ export default function SearchScreen({ navigation }: any) {
   const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [allLoaded, setAllLoaded] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
-  const loadedExtra = useRef(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [locationMissing, setLocationMissing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      fetchPlayers();
-      const fetchUnreadCount = async () => {
+      const init = async () => {
+        setInitializing(true);
         try {
           const res = await profileApi.getProfile();
-          if (res.success) {
+          if (res.success && res.data) {
             setUnreadCount(res.unreadNotificationsCount || 0);
+            const coords = res.data.location?.coordinates;
+            if (Array.isArray(coords) && coords.length === 2) {
+              // GeoJSON stores coordinates as [longitude, latitude]
+              const location = { latitude: coords[1], longitude: coords[0] };
+              setUserLocation(location);
+              setLocationMissing(false);
+              await fetchPlayers(location);
+              return;
+            }
           }
+          setLocationMissing(true);
+          setAllPlayers([]);
         } catch (error) {
-          console.error('Failed to fetch unread notifications count:', error);
+          console.error('Failed to load profile/location:', error);
+          setLocationMissing(true);
+          setAllPlayers([]);
+        } finally {
+          setInitializing(false);
         }
       };
-      fetchUnreadCount();
+      init();
     }, [])
   );
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = async (location: { latitude: number; longitude: number }, offset = 0) => {
     try {
-      setLoading(true);
-      console.log('SearchScreen: Fetching players for location:', CURRENT_USER_LOCATION);
+      if (offset === 0) setLoading(true);
+      else setLoadingMore(true);
+
       const res = await matchmakingApi.getNearbyPlayers({
-        lat: CURRENT_USER_LOCATION.latitude,
-        lng: CURRENT_USER_LOCATION.longitude,
+        lat: location.latitude,
+        lng: location.longitude,
         radiusKm: 20,
         limit: 25,
+        offset,
       });
-      console.log('SearchScreen: API response success status:', res?.success);
-      console.log('SearchScreen: API response data length:', res?.data?.length);
 
       if (res.success && res.data) {
         const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => {
@@ -223,8 +113,6 @@ export default function SearchScreen({ navigation }: any) {
             Array.isArray(coords) && coords.length === 2
               ? { latitude: coords[1], longitude: coords[0] }
               : undefined;
-
-          console.log(`SearchScreen: Player ${p.user?.name || p._id} coordinate:`, coordinate);
 
           return {
             id: p.user?._id || p._id,
@@ -240,19 +128,23 @@ export default function SearchScreen({ navigation }: any) {
             connectionStatus: p.connectionStatus || 'none',
             conversationId: p.conversationId,
             coordinate,
+            avgRating: p.avgRating,
+            ratingCount: p.ratingCount,
+            emailVerified: p.user?.emailVerified,
           };
         });
-        console.log('SearchScreen: Total mapped players:', mappedPlayers.length);
-        setAllPlayers(mappedPlayers);
-      } else {
-        console.log('SearchScreen: API success is false or no data returned');
+        setAllPlayers(prev => (offset === 0 ? mappedPlayers : [...prev, ...mappedPlayers]));
+        setHasMore(Boolean(res.hasMore));
+      } else if (offset === 0) {
         setAllPlayers([]);
+        setHasMore(false);
       }
     } catch (error) {
       console.error('SearchScreen: Failed to fetch players error:', error);
-      setAllPlayers([]);
+      if (offset === 0) setAllPlayers([]);
     } finally {
-      setLoading(false);
+      if (offset === 0) setLoading(false);
+      else setLoadingMore(false);
     }
   };
 
@@ -353,14 +245,9 @@ export default function SearchScreen({ navigation }: any) {
   const handleApplyFilters = useCallback((f: FilterState) => setFilters(f), []);
 
   const handleLoadMore = useCallback(() => {
-    if (loadingMore || allLoaded || loadedExtra.current) return;
-    loadedExtra.current = true;
-    setLoadingMore(true);
-    setTimeout(() => {
-      setLoadingMore(false);
-      setAllLoaded(true);
-    }, 500);
-  }, [loadingMore, allLoaded]);
+    if (loadingMore || loading || !hasMore || !userLocation) return;
+    fetchPlayers(userLocation, allPlayers.length);
+  }, [loadingMore, loading, hasMore, userLocation, allPlayers.length]);
 
   // ─── List Header ────────────────────────────────────────────────────
   const ListHeader = (
@@ -402,14 +289,14 @@ export default function SearchScreen({ navigation }: any) {
         <MapView
           style={styles.map}
           initialRegion={{
-            ...CURRENT_USER_LOCATION,
+            ...(userLocation ?? DEFAULT_MAP_REGION),
             latitudeDelta: 0.15,
             longitudeDelta: 0.15,
           }}
         >
           {/* "You" pin */}
           <PlayerMapMarker
-            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: CURRENT_USER_LOCATION, isCurrentUser: true }}
+            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: userLocation ?? DEFAULT_MAP_REGION, isCurrentUser: true }}
           />
 
           {/* Player pins — only players with a known (approximate) location */}
@@ -465,13 +352,50 @@ export default function SearchScreen({ navigation }: any) {
         Finding more players…
       </Text>
     </View>
-  ) : allLoaded ? (
+  ) : !hasMore && allPlayers.length > 0 ? (
     <View style={styles.footerLoader}>
       <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
         🎉 You've seen all nearby players!
       </Text>
     </View>
   ) : null;
+
+  if (initializing) {
+    return (
+      <ScreenWrapper>
+        <Header showLogo showNotificationBell notificationCount={unreadCount} />
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
+  if (locationMissing) {
+    return (
+      <ScreenWrapper>
+        <Header showLogo showNotificationBell notificationCount={unreadCount} />
+        <View style={styles.centerState}>
+          <MapPin size={48} color={colors.primary} />
+          <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800', marginTop: spacing.lg, textAlign: 'center' }]}>
+            Add your location
+          </Text>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center' }]}>
+            We need your city, state, or zip code to show you pickleball players nearby.
+          </Text>
+          <TouchableOpacity
+            style={[styles.completeProfileBtn, { backgroundColor: colors.primary }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>
+              Complete Profile
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper>
@@ -599,5 +523,17 @@ const styles = StyleSheet.create({
   footerLoader: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  completeProfileBtn: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
   },
 });

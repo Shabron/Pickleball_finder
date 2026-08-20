@@ -9,7 +9,7 @@ const { geocodeApprox } = require('../utils/geocode');
 // @access  Private
 const getMyProfile = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.user._id }).populate('user', 'name email');
+    const profile = await Profile.findOne({ user: req.user._id }).populate('user', 'name email emailVerified');
 
     if (!profile) {
       return res.status(404).json({ success: false, message: 'Profile not found. Please create your profile.' });
@@ -101,7 +101,7 @@ const updateMyProfile = async (req, res) => {
     } else {
       // Create new
       profile = await Profile.create(profileFields);
-      profile = await Profile.findById(profile._id).populate('user', 'name email');
+      profile = await Profile.findById(profile._id).populate('user', 'name email emailVerified');
       isNewlyCompleted = true;
     }
 
@@ -142,7 +142,7 @@ const updateMyProfile = async (req, res) => {
 // @access  Private
 const getProfileByUserId = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.params.userId }).populate('user', 'name email');
+    const profile = await Profile.findOne({ user: req.params.userId }).populate('user', 'name email emailVerified');
 
     if (!profile) {
       return res.status(404).json({ success: false, message: 'Profile not found' });

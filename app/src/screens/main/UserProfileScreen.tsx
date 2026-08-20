@@ -23,11 +23,14 @@ import {
   Users,
   Calendar,
   ChevronLeft,
+  MoreVertical,
+  Star,
 } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
+import ReportBlockSheet from '../../components/ReportBlockSheet';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
@@ -45,6 +48,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
   
   const [player, setPlayer] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [showActionSheet, setShowActionSheet] = React.useState(false);
 
   React.useEffect(() => {
     const fetchUser = async () => {
@@ -71,6 +75,9 @@ export default function UserProfileScreen({ navigation, route }: any) {
             stats: { matches: 0, wins: 0, partners: 0 },
             connectionStatus: p.connectionStatus || 'none',
             conversationId: p.conversationId,
+            avgRating: p.avgRating,
+            ratingCount: p.ratingCount,
+            emailVerified: p.user?.emailVerified,
           });
         }
       } catch (err) {
@@ -186,15 +193,25 @@ export default function UserProfileScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Match score badge */}
-          {player.matchScore && (
-            <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
-              <Zap size={13} color={scoreColor} />
-              <Text style={[typography.labelSmall, { color: scoreColor, fontWeight: '700', marginLeft: 3 }]}>
-                {player.matchScore}% Match
-              </Text>
-            </View>
-          )}
+          {/* Match score badge + overflow menu */}
+          <View style={styles.topRightStack}>
+            {player.matchScore && (
+              <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
+                <Zap size={13} color={scoreColor} />
+                <Text style={[typography.labelSmall, { color: scoreColor, fontWeight: '700', marginLeft: 3 }]}>
+                  {player.matchScore}% Match
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.overflowBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+              activeOpacity={0.75}
+              onPress={() => setShowActionSheet(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MoreVertical size={18} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          </View>
 
           {/* Avatar with double ring */}
           <View style={styles.avatarSection}>
@@ -215,8 +232,20 @@ export default function UserProfileScreen({ navigation, route }: any) {
                 {player.age}
               </Text>
             )}
-            <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
+            {player.emailVerified && (
+              <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
+            )}
           </View>
+
+          {/* Rating */}
+          {!!player.ratingCount && (
+            <View style={styles.ratingRow}>
+              <Star size={15} color={colors.tertiary} fill={colors.tertiary} />
+              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: 5, fontWeight: '600' }]}>
+                {player.avgRating?.toFixed(1)} ({player.ratingCount} rating{player.ratingCount === 1 ? '' : 's'})
+              </Text>
+            </View>
+          )}
 
           {/* Skill level */}
           <View style={[styles.levelChip, { backgroundColor: colors.primaryContainer }]}>
@@ -326,6 +355,15 @@ export default function UserProfileScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       </Animated.ScrollView>
+
+      <ReportBlockSheet
+        visible={showActionSheet}
+        userId={player.id}
+        userName={player.fullName}
+        context="profile"
+        onClose={() => setShowActionSheet(false)}
+        onBlocked={() => navigation.goBack()}
+      />
     </ScreenWrapper>
   );
 }
@@ -364,15 +402,26 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
-  scoreBadge: {
+  topRightStack: {
     position: 'absolute',
     top: spacing.lg,
     right: spacing.lg,
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  scoreBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.full,
+  },
+  overflowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarSection: {
     marginBottom: spacing.xl,
@@ -395,6 +444,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   levelChip: {
     paddingHorizontal: spacing.lg,
