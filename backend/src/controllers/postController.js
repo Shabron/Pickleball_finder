@@ -4,60 +4,7 @@ const SavedPost = require('../models/SavedPost');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
 const { sendPushNotification } = require('../utils/push');
-
-const stateNeighbors = {
-  AL: ['FL', 'GA', 'MS', 'TN'],
-  AK: ['WA'], // No land borders with US, WA is closest
-  AZ: ['CA', 'CO', 'NV', 'NM', 'UT'],
-  AR: ['LA', 'MS', 'MO', 'OK', 'TN', 'TX'],
-  CA: ['AZ', 'NV', 'OR'],
-  CO: ['AZ', 'KS', 'NE', 'NM', 'OK', 'UT', 'WY'],
-  CT: ['MA', 'NY', 'RI'],
-  DE: ['MD', 'NJ', 'PA'],
-  FL: ['AL', 'GA'],
-  GA: ['AL', 'FL', 'NC', 'SC', 'TN'],
-  HI: ['CA'], // Closest
-  ID: ['MT', 'NV', 'OR', 'UT', 'WA', 'WY'],
-  IL: ['IN', 'IA', 'MI', 'KY', 'MO', 'WI'],
-  IN: ['IL', 'KY', 'MI', 'OH'],
-  IA: ['IL', 'MN', 'MO', 'NE', 'SD', 'WI'],
-  KS: ['CO', 'MO', 'NE', 'OK'],
-  KY: ['IL', 'IN', 'MO', 'OH', 'TN', 'VA', 'WV'],
-  LA: ['AR', 'MS', 'TX'],
-  ME: ['NH'],
-  MD: ['DE', 'PA', 'VA', 'WV'],
-  MA: ['CT', 'NH', 'NY', 'RI', 'VT'],
-  MI: ['IL', 'IN', 'OH', 'WI'],
-  MN: ['IA', 'MI', 'ND', 'SD', 'WI'],
-  MS: ['AL', 'AR', 'LA', 'TN'],
-  MO: ['AR', 'IL', 'IA', 'KS', 'KY', 'NE', 'OK', 'TN'],
-  MT: ['ID', 'ND', 'SD', 'WY'],
-  NE: ['CO', 'IA', 'KS', 'MO', 'SD', 'WY'],
-  NV: ['AZ', 'CA', 'ID', 'OR', 'UT'],
-  NH: ['ME', 'MA', 'VT'],
-  NJ: ['DE', 'NY', 'PA'],
-  NM: ['AZ', 'CO', 'OK', 'TX', 'UT'],
-  NY: ['CT', 'MA', 'NJ', 'PA', 'VT'],
-  NC: ['GA', 'SC', 'TN', 'VA'],
-  ND: ['MN', 'MT', 'SD'],
-  OH: ['IN', 'KY', 'MI', 'PA', 'WV'],
-  OK: ['AR', 'CO', 'KS', 'MO', 'NM', 'TX'],
-  OR: ['CA', 'ID', 'NV', 'WA'],
-  PA: ['DE', 'MD', 'NJ', 'NY', 'OH', 'WV'],
-  RI: ['CT', 'MA'],
-  SC: ['GA', 'NC'],
-  SD: ['IA', 'MN', 'MT', 'NE', 'ND', 'WY'],
-  TN: ['AL', 'AR', 'GA', 'KY', 'MS', 'MO', 'NC', 'VA'],
-  TX: ['AR', 'LA', 'NM', 'OK'],
-  UT: ['AZ', 'CO', 'ID', 'NV', 'NM', 'WY'],
-  VT: ['MA', 'NH', 'NY'],
-  VA: ['KY', 'MD', 'NC', 'TN', 'WV'],
-  WA: ['ID', 'OR'],
-  WV: ['KY', 'MD', 'OH', 'PA', 'VA'],
-  WI: ['IL', 'IA', 'MI', 'MN'],
-  WY: ['CO', 'ID', 'MT', 'NE', 'SD', 'UT'],
-  DC: ['MD', 'VA']
-};
+const { geocodeApprox } = require('../utils/geocode');
 
 const removeUndefined = (obj) => {
   const cleaned = { ...obj };
@@ -67,12 +14,13 @@ const removeUndefined = (obj) => {
   return cleaned;
 };
 
-// @desc    List posts
-// @route   GET /api/posts
+// @desc    List posts — not bound to a single state; when the caller's lat/lng
+//          are known, sorted nearest-first by real distance instead.
+// @route   GET /api/posts?lat=&lng=&state=&skillLevel=&playStyle=&status=&page=&limit=
 // @access  Public
 const getPosts = async (req, res) => {
   try {
-    const { state, skillLevel, playStyle, status, page = '1', limit = '20' } = req.query;
+    const { state, skillLevel, playStyle, status, page = '1', limit = '20', lat, lng } = req.query;
 
     const pageNum = Number.parseInt(page, 10) || 1;
     const limitNum = Number.parseInt(limit, 10) || 20;
@@ -86,47 +34,61 @@ const getPosts = async (req, res) => {
       author: req.query.author,
     });
 
-    let total = await Post.countDocuments(filter);
-    let posts = await Post.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .populate('author', 'name email');
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    const hasViewerLocation = !Number.isNaN(latNum) && !Number.isNaN(lngNum) && lat !== undefined && lng !== undefined;
 
-    let fallbackUsed = false;
+    let posts;
+    let total;
 
-    // Fallback logic if no posts found in the requested state
-    if (posts.length === 0 && state) {
-      fallbackUsed = true;
-      const neighbors = stateNeighbors[state] || [];
-      
-      if (neighbors.length > 0) {
-        filter.state = { $in: neighbors };
-        total = await Post.countDocuments(filter);
-        posts = await Post.find(filter)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limitNum)
-          .populate('author', 'name email');
-      }
+    if (hasViewerLocation) {
+      // Nearest-first: geocoded posts sorted by real distance from the viewer.
+      const MAX_CANDIDATES = 500; // safety cap, not a hard page size
+      const nearPosts = await Post.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [lngNum, latNum] },
+            distanceField: 'distanceMeters',
+            spherical: true,
+            query: { ...filter, location: { $exists: true, $ne: null } },
+            key: 'location',
+          },
+        },
+        { $sort: { distanceMeters: 1 } },
+        { $limit: MAX_CANDIDATES },
+      ]);
 
-      // If still empty, drop the state filter entirely to show ANY posts
-      if (posts.length === 0) {
-        delete filter.state;
-        total = await Post.countDocuments(filter);
-        posts = await Post.find(filter)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limitNum)
-          .populate('author', 'name email');
-      }
+      // Legacy posts with no geocoded location — appended after (newest
+      // first) so nothing silently disappears while data backfills.
+      const noLocationPosts = await Post.find({
+        ...filter,
+        $or: [{ location: { $exists: false } }, { location: null }],
+      })
+        .sort({ createdAt: -1 })
+        .limit(MAX_CANDIDATES)
+        .lean();
+
+      const combined = [
+        ...nearPosts.map((p) => ({ ...p, distanceKm: Math.round((p.distanceMeters / 1000) * 10) / 10 })),
+        ...noLocationPosts,
+      ];
+      total = combined.length;
+      const page = combined.slice(skip, skip + limitNum);
+      posts = await Post.populate(page, { path: 'author', select: 'name email' });
+    } else {
+      // Viewer location unknown — fall back to newest-first, everywhere.
+      total = await Post.countDocuments(filter);
+      posts = await Post.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .populate('author', 'name email');
     }
 
     return res.status(200).json({
       success: true,
       data: {
         posts,
-        fallbackUsed,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -155,6 +117,9 @@ const createPost = async (req, res) => {
       });
     }
 
+    const approx = geocodeApprox({ city, state });
+    const location = approx ? { type: 'Point', coordinates: [approx.longitude, approx.latitude] } : undefined;
+
     const postFields = removeUndefined({
       author: req.user._id,
       title,
@@ -165,6 +130,7 @@ const createPost = async (req, res) => {
       playStyle,
       preferredTime,
       status,
+      location,
     });
 
     const post = await Post.create(postFields);
@@ -217,6 +183,12 @@ const updatePost = async (req, res) => {
   try {
     const { title, description, state, city, skillLevel, playStyle, preferredTime, status } = req.body;
 
+    let location;
+    if (state || city) {
+      const approx = geocodeApprox({ city, state });
+      if (approx) location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+    }
+
     const postFields = removeUndefined({
       title,
       description,
@@ -226,6 +198,7 @@ const updatePost = async (req, res) => {
       playStyle,
       preferredTime,
       status,
+      location,
     });
 
     const updatedPost = await Post.findOneAndUpdate(

@@ -120,10 +120,9 @@ export default function SearchScreen({ navigation }: any) {
             level: p.skillLevel || 'N/A',
             distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
             avatarUri: p.user?.avatar || undefined,
-            matchScore: Math.floor(Math.random() * 40) + 60,
+            matchScore: p.matchScore,
             playStyle: p.playStyle || 'Any',
             bio: p.bio || '',
-            isOnline: Math.random() > 0.5,
             age: p.age || undefined,
             connectionStatus: p.connectionStatus || 'none',
             conversationId: p.conversationId,
@@ -207,7 +206,6 @@ export default function SearchScreen({ navigation }: any) {
     filters.skillLevels.length +
     filters.playStyles.length +
     (filters.maxDistance !== 'Any' ? 1 : 0) +
-    (filters.onlineOnly ? 1 : 0) +
     (filters.sortBy !== 'matchScore' ? 1 : 0);
 
   // Apply filters + sort
@@ -231,11 +229,8 @@ export default function SearchScreen({ navigation }: any) {
         return filters.playStyles.some(s => p.playStyle!.toLowerCase().includes(s.toLowerCase()));
       });
     }
-    if (filters.onlineOnly) list = list.filter(p => p.isOnline);
     if (filters.sortBy === 'distance') {
       list.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
-    } else if (filters.sortBy === 'recent') {
-      list.sort((a, b) => (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0));
     } else {
       list.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
     }

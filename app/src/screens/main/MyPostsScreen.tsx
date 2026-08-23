@@ -5,10 +5,10 @@
  * Uses tonal layering, themed components, no border dividers.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { postApi, profileApi } from '../../services/api';
-import { Plus, Edit2, Trash2, MessageSquare } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, MessageSquare, CheckCircle2, RotateCcw } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Card from '../../components/common/Card';
@@ -43,6 +43,7 @@ export default function MyPostsScreen({ navigation }: any) {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,6 +65,23 @@ export default function MyPostsScreen({ navigation }: any) {
       fetchPosts();
     }, [])
   );
+
+  const handleToggleStatus = async (post: any) => {
+    const nextStatus = post.status === 'Open' ? 'Closed' : 'Open';
+    setTogglingId(post._id);
+    try {
+      const res = await postApi.updatePost(post._id, { status: nextStatus });
+      if (res.success) {
+        setPosts(prev => prev.map(p => (p._id === post._id ? { ...p, status: nextStatus } : p)));
+      } else {
+        Alert.alert('Something went wrong', res.message || 'Failed to update post status.');
+      }
+    } catch (error: any) {
+      Alert.alert('Something went wrong', error.message || 'Failed to update post status.');
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const renderPostItem = ({ item }: { item: any }) => (
     <View style={styles.cardAccentWrapper}>
@@ -102,6 +120,26 @@ export default function MyPostsScreen({ navigation }: any) {
 
         {/* Actions */}
         <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.brandGreenContainer }]}
+            onPress={() => handleToggleStatus(item)}
+            disabled={togglingId === item._id}
+          >
+            {item.status === 'Open' ? (
+              <CheckCircle2 size={16} color={colors.onBrandGreenContainer} />
+            ) : (
+              <RotateCcw size={16} color={colors.onBrandGreenContainer} />
+            )}
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: colors.onBrandGreenContainer, marginLeft: spacing.xs },
+              ]}
+            >
+              {togglingId === item._id ? '…' : item.status === 'Open' ? 'Close' : 'Reopen'}
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.secondaryContainer }]}
             onPress={() => navigation.navigate('CreatePost', { post: item })}
@@ -238,6 +276,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   actionBtn: {

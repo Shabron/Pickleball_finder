@@ -65,12 +65,11 @@ export default function UserProfileScreen({ navigation, route }: any) {
             age: p.ageRange || 'N/A',
             level: p.skillLevel || 'N/A',
             distance: 'Nearby', // Mocked for now
-            matchScore: 85, // Mocked for now
+            matchScore: p.matchScore,
             playStyle: Array.isArray(p.playStyle) ? p.playStyle : (p.playStyle ? [p.playStyle] : []),
             bio: p.bio || 'No bio provided.',
             location: `${p.city ? p.city + ', ' : ''}${p.state || ''}`,
             memberSince: new Date(p.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-            isOnline: true,
             avatarUri: p.avatar ? `${API_BASE_URL.replace('/api', '')}${p.avatar}` : undefined,
             stats: { matches: 0, wins: 0, partners: 0 },
             connectionStatus: p.connectionStatus || 'none',
@@ -183,16 +182,6 @@ export default function UserProfileScreen({ navigation, route }: any) {
       >
         {/* ─── Hero card ─── */}
         <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
-          {/* Online badge */}
-          {player.isOnline && (
-            <View style={[styles.onlineBadge, { backgroundColor: colors.success + '22' }]}>
-              <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
-              <Text style={[typography.labelSmall, { color: colors.success, fontWeight: '700' }]}>
-                Online Now
-              </Text>
-            </View>
-          )}
-
           {/* Match score badge + overflow menu */}
           <View style={styles.topRightStack}>
             {player.matchScore && (
@@ -385,22 +374,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
     position: 'relative',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-    gap: 5,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
   },
   topRightStack: {
     position: 'absolute',

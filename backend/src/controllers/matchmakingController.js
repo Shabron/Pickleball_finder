@@ -1,6 +1,7 @@
 const Profile = require('../models/Profile');
 const Conversation = require('../models/Conversation');
 const User = require('../models/User');
+const { computeMatchScore } = require('../utils/matchScore');
 
 // @desc    Find nearby players (by profile location)
 // @route   GET /api/matchmaking/nearby?lat=&lng=&radiusKm=&skillLevel=&playStyle=&limit=&offset=
@@ -26,6 +27,8 @@ const getNearbyPlayers = async (req, res) => {
     }
 
     const maxDistanceMeters = radiusKmNum * 1000;
+
+    const myProfile = await Profile.findOne({ user: req.user._id }, 'skillLevel playStyle');
 
     // Exclude both directions: users I've blocked, and users who've blocked me.
     const blockedByMe = req.user.blockedUsers || [];
@@ -85,12 +88,16 @@ const getNearbyPlayers = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: profiles.map((p) => ({
-        ...p,
-        distanceKm: p.distanceMeters != null ? Math.round((p.distanceMeters / 1000) * 10) / 10 : null,
-        connectionStatus: statusMap[p.user._id.toString()] || 'none',
-        conversationId: conversations.find(c => c.participants.some(par => par.toString() === p.user._id.toString()))?._id || null,
-      })),
+      data: profiles.map((p) => {
+        const distanceKm = p.distanceMeters != null ? Math.round((p.distanceMeters / 1000) * 10) / 10 : null;
+        return {
+          ...p,
+          distanceKm,
+          matchScore: computeMatchScore(myProfile, p, distanceKm),
+          connectionStatus: statusMap[p.user._id.toString()] || 'none',
+          conversationId: conversations.find(c => c.participants.some(par => par.toString() === p.user._id.toString()))?._id || null,
+        };
+      }),
       hasMore,
       nextOffset: offsetNum + profiles.length,
     });

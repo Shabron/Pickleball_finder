@@ -174,13 +174,12 @@ export default function ChatThreadScreen({ navigation, route }: any) {
             <ChevronLeft color={colors.onSurface} size={sizes.iconLarge} />
           </TouchableOpacity>
 
-          <Avatar name={partnerName} size={42} showOnline />
+          <Avatar name={partnerName} size={42} />
 
           <View style={styles.headerInfo}>
             <Text style={[typography.titleSmall, { color: colors.onSurface }]}>
               {partnerName}
             </Text>
-            <Text style={[typography.labelSmall, { color: colors.success }]}>Online</Text>
           </View>
 
           <TouchableOpacity

@@ -25,7 +25,6 @@ interface ChatPreview {
   message: string;
   unreadCount: number;
   avatarUri?: string;
-  isOnline?: boolean;
   status: string;
   initiator?: string;
 }
@@ -62,7 +61,6 @@ export default function MessagesListScreen({ navigation }: any) {
             message: conv.lastMessage?.content || 'Started a conversation',
             unreadCount: conv.unreadCount || 0,
             avatarUri: undefined,
-            isOnline: true, // Mock
             status: conv.status,
             initiator: conv.initiator,
           };
@@ -113,7 +111,7 @@ export default function MessagesListScreen({ navigation }: any) {
         onPress={() => navigation.navigate('ChatThread', { conversationId: item.id, userId: item.userId, name: item.name })}
         activeOpacity={0.7}
       >
-        <Avatar name={item.name} uri={item.avatarUri} size={52} showOnline={item.isOnline} />
+        <Avatar name={item.name} uri={item.avatarUri} size={52} />
 
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>

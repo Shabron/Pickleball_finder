@@ -36,7 +36,6 @@ export interface PlayerProfileData {
   matchScore?: number;
   playStyle?: string;
   bio?: string;
-  isOnline?: boolean;
   age?: number;
   connectionStatus?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
   conversationId?: string;
@@ -126,14 +125,6 @@ export default function PlayerProfileCard({
         </View>
       )}
 
-      {/* ─── Online badge (top-left) ─── */}
-      {player.isOnline && (
-        <View style={[styles.onlineBadge, { backgroundColor: colors.success + '22' }]}>
-          <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
-          <Text style={[typography.labelSmall, { color: colors.success, fontWeight: '600' }]}>Online</Text>
-        </View>
-      )}
-
       {/* ─── Avatar with decorative ring ─── */}
       <View style={styles.avatarSection}>
         <View style={[styles.avatarOuterRing, { borderColor: colors.primary + '40' }]}>
@@ -143,7 +134,6 @@ export default function PlayerProfileCard({
                 name={player.name}
                 uri={player.avatarUri}
                 size={sizes.avatarXLarge + 40}
-                showOnline={player.isOnline}
               />
             </TouchableOpacity>
           </View>
@@ -319,22 +309,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.full,
-  },
-  onlineBadge: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-    gap: 5,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
   },
   avatarSection: {
     marginBottom: spacing.xl,

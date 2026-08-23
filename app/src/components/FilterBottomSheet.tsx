@@ -5,7 +5,6 @@
  *  - Skill Level (multi-select chips)
  *  - Max Distance (single-select)
  *  - Play Style (multi-select chips)
- *  - Status (Online Now / All)
  *  - Sort By
  *
  * Calls onApply with the selected filters, and onClose to dismiss.
@@ -33,15 +32,13 @@ export interface FilterState {
   skillLevels: string[];    // e.g. ['2.5', '3.0']
   maxDistance: string;      // e.g. '5 mi'
   playStyles: string[];     // e.g. ['Doubles', 'Mixed']
-  onlineOnly: boolean;
-  sortBy: string;           // 'matchScore' | 'distance' | 'recent'
+  sortBy: string;           // 'matchScore' | 'distance'
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   skillLevels: [],
   maxDistance: 'Any',
   playStyles: [],
-  onlineOnly: false,
   sortBy: 'matchScore',
 };
 
@@ -60,7 +57,6 @@ const PLAY_STYLES = ['Singles', 'Doubles', 'Mixed', 'Any'];
 const SORT_OPTIONS = [
   { key: 'matchScore', label: '⚡ Match Score' },
   { key: 'distance', label: '📍 Distance' },
-  { key: 'recent', label: '🕐 Recently Active' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -170,7 +166,6 @@ export default function FilterBottomSheet({
     local.skillLevels.length +
     local.playStyles.length +
     (local.maxDistance !== 'Any' ? 1 : 0) +
-    (local.onlineOnly ? 1 : 0) +
     (local.sortBy !== 'matchScore' ? 1 : 0);
 
   const handleApply = () => {
@@ -255,36 +250,6 @@ export default function FilterBottomSheet({
             colors={colors}
             typography={typography}
           />
-
-          {/* ── Online Status ── */}
-          <SectionLabel label="🟢 Availability" colors={colors} typography={typography} />
-          <View style={styles.chipRow}>
-            {[
-              { label: 'All Players', val: false },
-              { label: 'Online Now', val: true },
-            ].map(opt => {
-              const active = local.onlineOnly === opt.val;
-              return (
-                <TouchableOpacity
-                  key={String(opt.val)}
-                  onPress={() => setSingle('onlineOnly', opt.val)}
-                  activeOpacity={0.75}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: active ? colors.success : colors.surfaceContainerHigh,
-                      borderColor: active ? colors.success : colors.outline,
-                    },
-                  ]}
-                >
-                  {active && <Check size={12} color="#fff" style={{ marginRight: 4 }} />}
-                  <Text style={[typography.labelMedium, { color: active ? '#fff' : colors.onSurfaceVariant, fontWeight: active ? '700' : '500' }]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
           {/* ── Sort By ── */}
           <SectionLabel label="↕ Sort By" colors={colors} typography={typography} />

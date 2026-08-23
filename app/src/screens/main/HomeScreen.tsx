@@ -1,11 +1,10 @@
 /**
- * HomeScreen — Posts & Location Filter
+ * HomeScreen — Partner Posts feed
  *
- * Matches Stitch "Posts & Location Filter" design:
- * - Filter bar with state dropdown and distance slider
- * - Partner post cards with tonal layering
- * - FAB for creating new posts
- * - Responsive layout
+ * Not bound to a single state: shows every open post, nearest-first by real
+ * distance from the signed-in user's profile location. Posts without a
+ * resolvable distance (or before a location is known) fall back to
+ * newest-first so nothing silently disappears.
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
@@ -16,12 +15,9 @@ import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PartnerPostCard, { PartnerPostData } from '../../components/PartnerPostCard';
-import Dropdown from '../../components/common/Dropdown';
 import FAB from '../../components/common/FAB';
-import Slider from '../../components/common/Slider';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
-import { US_STATES } from '../../constants/states';
 
 const formatTimeAgo = (dateString: string) => {
   if (!dateString) return '';
@@ -36,8 +32,6 @@ const formatTimeAgo = (dateString: string) => {
 };
 
 export default function HomeScreen({ navigation }: any) {
-  const [location, setLocation] = useState('FL');
-  const [distance, setDistance] = useState(10);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -49,19 +43,40 @@ export default function HomeScreen({ navigation }: any) {
     ensurePushRegistration();
   }, []);
 
-  // Fetch unread notifications count and saved post ids whenever home is focused
+  // Fetch profile (unread count + location), saved post ids, and the
+  // nearest-first post feed whenever Home is focused.
   useFocusEffect(
     React.useCallback(() => {
-      const fetchUnreadCount = async () => {
+      const fetchPosts = async (params: { lat?: number; lng?: number }) => {
+        setLoading(true);
+        try {
+          const res = await postApi.getPosts({ status: 'Open', ...params });
+          setPosts(res.data.posts);
+        } catch (error) {
+          console.error('Failed to fetch posts:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const fetchProfileAndPosts = async () => {
         try {
           const res = await profileApi.getProfile();
           if (res.success) {
             setUnreadCount(res.unreadNotificationsCount || 0);
+            const coords = res.data?.location?.coordinates;
+            if (Array.isArray(coords) && coords.length === 2) {
+              // GeoJSON stores coordinates as [longitude, latitude]
+              await fetchPosts({ lat: coords[1], lng: coords[0] });
+              return;
+            }
           }
         } catch (error) {
-          console.error('Failed to fetch unread notifications count:', error);
+          console.error('Failed to fetch profile:', error);
         }
+        await fetchPosts({});
       };
+
       const fetchSavedPostIds = async () => {
         try {
           const res = await postApi.getSavedPosts();
@@ -72,25 +87,12 @@ export default function HomeScreen({ navigation }: any) {
           console.error('Failed to fetch saved posts:', error);
         }
       };
-      fetchUnreadCount();
+
+      fetchProfileAndPosts();
       fetchSavedPostIds();
     }, [])
   );
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      setLoading(true);
-      try {
-        const res = await postApi.getPosts({ state: location });
-        setPosts(res.data.posts);
-      } catch (error) {
-        console.error('Failed to fetch posts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPosts();
-  }, [location]);
   const { colors, typography } = useTheme();
 
   const handleMessage = async (authorId: string, authorName: string) => {
@@ -125,41 +127,7 @@ export default function HomeScreen({ navigation }: any) {
         onNotificationPress={() => navigation.navigate('Notifications')}
         style={{ backgroundColor: 'transparent' }}
       />
-      
 
-
-      {/* ─── Filter Section ─── */}
-      <View
-        style={[
-          styles.filterSection,
-          {
-            backgroundColor: '#FFFFFF',
-            borderBottomWidth: 3,
-            borderBottomColor: colors.brandGreen,
-          },
-        ]}
-      >
-        <Text
-          style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.sm }]}
-        >
-          Showing posts in:
-        </Text>
-        <Dropdown
-          options={US_STATES}
-          value={location}
-          onSelect={setLocation}
-          placeholder="Select State"
-        />
-
-        {/* Distance indicator */}
-        <Slider
-          min={1}
-          max={50}
-          value={distance}
-          onValueChange={setDistance}
-          label={`Within ${distance} mi`}
-        />
-      </View>
 
       {/* ─── Post List ─── */}
       <View style={styles.listHeader}>
@@ -193,7 +161,9 @@ export default function HomeScreen({ navigation }: any) {
                 timeAgo: formatTimeAgo(item.createdAt),
                 content: item.description,
                 playStyle: item.playStyle,
-                location: `${item.city ? item.city + ', ' : ''}${item.state}`,
+                location: `${item.city ? item.city + ', ' : ''}${item.state}${
+                  item.distanceKm != null ? ` · ${(item.distanceKm * 0.621371).toFixed(1)} mi away` : ''
+                }`,
               }}
               initialSaved={savedPostIds.has(item._id)}
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
@@ -222,16 +192,9 @@ const styles = StyleSheet.create({
     width: 280,
     height: 160,
   },
-  filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    borderBottomLeftRadius: borderRadius.xl,
-    borderBottomRightRadius: borderRadius.xl,
-    marginBottom: spacing.lg,
-  },
   listHeader: {
     paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
   activeBadge: {

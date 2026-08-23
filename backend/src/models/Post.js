@@ -45,6 +45,16 @@ const postSchema = new mongoose.Schema(
       enum: ['Open', 'Closed'],
       default: 'Open',
     },
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+      },
+      // GeoJSON coordinates are [longitude, latitude] — geocoded from city/state
+      coordinates: {
+        type: [Number],
+      },
+    },
   },
   {
     timestamps: true,
@@ -54,6 +64,7 @@ const postSchema = new mongoose.Schema(
 // Helpful queries for discovery
 postSchema.index({ state: 1, status: 1 });
 postSchema.index({ author: 1 });
+postSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Post', postSchema);
 
