@@ -22,10 +22,10 @@ export default function ScreenWrapper({ children, style, backgroundColor }: Scre
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }, style]}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={bg}
-      />
+      {/* No backgroundColor prop: it maps to the deprecated
+          Window.setStatusBarColor and is a no-op under edge-to-edge. The bar
+          area takes its colour from this SafeAreaView's background instead. */}
+      <StatusBar barStyle="dark-content" />
       {children}
     </SafeAreaView>
   );

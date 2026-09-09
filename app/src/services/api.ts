@@ -577,13 +577,27 @@ export const postApi = {
 };
 
 export const matchmakingApi = {
-  getNearbyPlayers: async (params: { lat: number; lng: number; radiusKm?: number; skillLevel?: string; playStyle?: string; limit?: number; offset?: number }) => {
+  getNearbyPlayers: async (params: {
+    mode?: 'nearby' | 'state' | 'zip';
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    state?: string;
+    zipCode?: string;
+    skillLevel?: string;
+    playStyle?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
     try {
       const token = await getToken();
       const queryParams = new URLSearchParams();
+      if (params.mode !== undefined) queryParams.append('mode', params.mode);
       if (params.lat !== undefined) queryParams.append('lat', params.lat.toString());
       if (params.lng !== undefined) queryParams.append('lng', params.lng.toString());
       if (params.radiusKm !== undefined) queryParams.append('radiusKm', params.radiusKm.toString());
+      if (params.state !== undefined) queryParams.append('state', params.state);
+      if (params.zipCode !== undefined) queryParams.append('zipCode', params.zipCode);
       if (params.skillLevel !== undefined) queryParams.append('skillLevel', params.skillLevel);
       if (params.playStyle !== undefined) queryParams.append('playStyle', params.playStyle);
       if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());

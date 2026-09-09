@@ -231,7 +231,24 @@ export default function EditProfileScreen({ navigation }: any) {
     );
   };
 
+  const validate = (): boolean => {
+    if (!profile.state) {
+      Alert.alert('Missing Info', 'Please select your state.');
+      return false;
+    }
+    if (!profile.city.trim()) {
+      Alert.alert('Missing Info', 'Please enter your city.');
+      return false;
+    }
+    if (profile.zipCode && !/^\d{5}$/.test(profile.zipCode.trim())) {
+      Alert.alert('Invalid Zip Code', 'Please enter a valid 5-digit zip code, or leave it blank.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    if (!validate()) return;
     setLoading(true);
     try {
       await profileApi.updateProfile(profile);

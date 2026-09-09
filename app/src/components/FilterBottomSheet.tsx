@@ -47,6 +47,8 @@ interface FilterBottomSheetProps {
   filters: FilterState;
   onApply: (filters: FilterState) => void;
   onClose: () => void;
+  /** When not 'nearby', there's no distance data to filter/sort by — hides those controls. */
+  mode?: 'nearby' | 'state' | 'zip';
 }
 
 // ─── Option sets ─────────────────────────────────────────────────────────────
@@ -124,8 +126,10 @@ export default function FilterBottomSheet({
   filters,
   onApply,
   onClose,
+  mode = 'nearby',
 }: FilterBottomSheetProps) {
   const { colors, typography } = useTheme();
+  const showDistanceControls = mode === 'nearby';
 
   // Local state — committed only on "Apply"
   const [local, setLocal] = useState<FilterState>({ ...filters });
@@ -165,8 +169,8 @@ export default function FilterBottomSheet({
   const activeCount =
     local.skillLevels.length +
     local.playStyles.length +
-    (local.maxDistance !== 'Any' ? 1 : 0) +
-    (local.sortBy !== 'matchScore' ? 1 : 0);
+    (showDistanceControls && local.maxDistance !== 'Any' ? 1 : 0) +
+    (showDistanceControls && local.sortBy !== 'matchScore' ? 1 : 0);
 
   const handleApply = () => {
     onApply(local);
@@ -230,16 +234,20 @@ export default function FilterBottomSheet({
             typography={typography}
           />
 
-          {/* ── Max Distance ── */}
-          <SectionLabel label="📍 Max Distance" colors={colors} typography={typography} />
-          <ChipGroup
-            options={DISTANCES}
-            selected={[local.maxDistance]}
-            multi={false}
-            onToggle={val => setSingle('maxDistance', val)}
-            colors={colors}
-            typography={typography}
-          />
+          {/* ── Max Distance (Nearby mode only — no distance data otherwise) ── */}
+          {showDistanceControls && (
+            <>
+              <SectionLabel label="📍 Max Distance" colors={colors} typography={typography} />
+              <ChipGroup
+                options={DISTANCES}
+                selected={[local.maxDistance]}
+                multi={false}
+                onToggle={val => setSingle('maxDistance', val)}
+                colors={colors}
+                typography={typography}
+              />
+            </>
+          )}
 
           {/* ── Play Style ── */}
           <SectionLabel label="🎯 Play Style" colors={colors} typography={typography} />
@@ -254,7 +262,7 @@ export default function FilterBottomSheet({
           {/* ── Sort By ── */}
           <SectionLabel label="↕ Sort By" colors={colors} typography={typography} />
           <View style={styles.sortList}>
-            {SORT_OPTIONS.map(opt => {
+            {SORT_OPTIONS.filter(opt => showDistanceControls || opt.key !== 'distance').map(opt => {
               const active = local.sortBy === opt.key;
               return (
                 <TouchableOpacity

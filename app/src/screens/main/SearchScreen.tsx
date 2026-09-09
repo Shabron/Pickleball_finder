@@ -7,7 +7,7 @@
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
  *  - onEndReached fetches the next page of nearby players from the API
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import MapView from 'react-native-maps';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
+import Dropdown from '../../components/common/Dropdown';
+import Input from '../../components/common/Input';
+import Button from '../../components/common/Button';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
 import PlayerMapMarker from '../../components/PlayerMapMarker';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
@@ -28,6 +31,10 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { SlidersHorizontal, MapPin } from 'lucide-react-native';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
+import { US_STATES_FOR_SEARCH } from '../../constants/states';
+
+type SearchMode = 'nearby' | 'state' | 'zip';
+const ZIP_REGEX = /^\d{5}$/;
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -60,6 +67,13 @@ export default function SearchScreen({ navigation }: any) {
   const [initializing, setInitializing] = useState(true);
   const [locationMissing, setLocationMissing] = useState(false);
 
+  // ── Search mode (Nearby / By State / By Zip) ──────────────────────────
+  const [searchMode, setSearchMode] = useState<SearchMode>('nearby');
+  const [selectedState, setSelectedState] = useState('ALL');
+  const [zipInput, setZipInput] = useState('');
+  const [zipError, setZipError] = useState<string | null>(null);
+  const [activeZip, setActiveZip] = useState<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       const init = async () => {
@@ -71,19 +85,20 @@ export default function SearchScreen({ navigation }: any) {
             const coords = res.data.location?.coordinates;
             if (Array.isArray(coords) && coords.length === 2) {
               // GeoJSON stores coordinates as [longitude, latitude]
-              const location = { latitude: coords[1], longitude: coords[0] };
-              setUserLocation(location);
+              setUserLocation({ latitude: coords[1], longitude: coords[0] });
               setLocationMissing(false);
-              await fetchPlayers(location);
-              return;
+            } else {
+              setUserLocation(null);
+              setLocationMissing(true);
             }
+          } else {
+            setUserLocation(null);
+            setLocationMissing(true);
           }
-          setLocationMissing(true);
-          setAllPlayers([]);
         } catch (error) {
           console.error('Failed to load profile/location:', error);
+          setUserLocation(null);
           setLocationMissing(true);
-          setAllPlayers([]);
         } finally {
           setInitializing(false);
         }
@@ -92,18 +107,54 @@ export default function SearchScreen({ navigation }: any) {
     }, [])
   );
 
-  const fetchPlayers = async (location: { latitude: number; longitude: number }, offset = 0) => {
+  // Re-runs the search whenever the active mode or its params change
+  // (state/zip searches don't need GPS; nearby needs userLocation).
+  useEffect(() => {
+    if (initializing) return;
+    setAllPlayers([]);
+    setHasMore(true);
+    if (searchMode === 'nearby') {
+      if (userLocation) fetchPlayers(0);
+    } else if (searchMode === 'state') {
+      fetchPlayers(0);
+    } else if (searchMode === 'zip') {
+      if (activeZip) fetchPlayers(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initializing, searchMode, userLocation, selectedState, activeZip]);
+
+  const fetchPlayers = async (offset = 0) => {
     try {
       if (offset === 0) setLoading(true);
       else setLoadingMore(true);
 
-      const res = await matchmakingApi.getNearbyPlayers({
-        lat: location.latitude,
-        lng: location.longitude,
-        radiusKm: 20,
-        limit: 25,
-        offset,
-      });
+      let res;
+      if (searchMode === 'nearby') {
+        if (!userLocation) return;
+        res = await matchmakingApi.getNearbyPlayers({
+          mode: 'nearby',
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
+          radiusKm: 20,
+          limit: 25,
+          offset,
+        });
+      } else if (searchMode === 'state') {
+        res = await matchmakingApi.getNearbyPlayers({
+          mode: 'state',
+          state: selectedState,
+          limit: 25,
+          offset,
+        });
+      } else {
+        if (!activeZip) return;
+        res = await matchmakingApi.getNearbyPlayers({
+          mode: 'zip',
+          zipCode: activeZip,
+          limit: 25,
+          offset,
+        });
+      }
 
       if (res.success && res.data) {
         const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => {
@@ -205,8 +256,8 @@ export default function SearchScreen({ navigation }: any) {
   const activeFilterCount =
     filters.skillLevels.length +
     filters.playStyles.length +
-    (filters.maxDistance !== 'Any' ? 1 : 0) +
-    (filters.sortBy !== 'matchScore' ? 1 : 0);
+    (searchMode === 'nearby' && filters.maxDistance !== 'Any' ? 1 : 0) +
+    (searchMode === 'nearby' && filters.sortBy !== 'matchScore' ? 1 : 0);
 
   // Apply filters + sort
   const players = useMemo(() => {
@@ -218,7 +269,7 @@ export default function SearchScreen({ navigation }: any) {
         )
       );
     }
-    if (filters.maxDistance !== 'Any') {
+    if (searchMode === 'nearby' && filters.maxDistance !== 'Any') {
       const maxMi = parseFloat(filters.maxDistance.replace(/[^\d.]/g, ''));
       list = list.filter(p => parseFloat(p.distance.replace(' mi', '')) <= maxMi);
     }
@@ -229,29 +280,122 @@ export default function SearchScreen({ navigation }: any) {
         return filters.playStyles.some(s => p.playStyle!.toLowerCase().includes(s.toLowerCase()));
       });
     }
-    if (filters.sortBy === 'distance') {
+    if (searchMode === 'nearby' && filters.sortBy === 'distance') {
       list.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
     } else {
       list.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
     }
     return list;
-  }, [allPlayers, filters]);
+  }, [allPlayers, filters, searchMode]);
 
   const handleApplyFilters = useCallback((f: FilterState) => setFilters(f), []);
 
   const handleLoadMore = useCallback(() => {
-    if (loadingMore || loading || !hasMore || !userLocation) return;
-    fetchPlayers(userLocation, allPlayers.length);
-  }, [loadingMore, loading, hasMore, userLocation, allPlayers.length]);
+    if (loadingMore || loading || !hasMore) return;
+    if (searchMode === 'nearby' && !userLocation) return;
+    if (searchMode === 'zip' && !activeZip) return;
+    fetchPlayers(allPlayers.length);
+  }, [loadingMore, loading, hasMore, userLocation, allPlayers.length, searchMode, activeZip, selectedState]);
+
+  const handleZipSearch = () => {
+    const trimmed = zipInput.trim();
+    if (!ZIP_REGEX.test(trimmed)) {
+      setZipError('Enter a valid 5-digit zip code');
+      return;
+    }
+    setZipError(null);
+    setActiveZip(trimmed);
+  };
+
+  const selectedStateLabel = US_STATES_FOR_SEARCH.find(s => s.value === selectedState)?.label || 'All States (Nationwide)';
+
+  // ─── Search mode toggle (Nearby / By State / By Zip) ─────────────────
+  const SEARCH_MODES: { key: SearchMode; label: string }[] = [
+    { key: 'nearby', label: 'Nearby' },
+    { key: 'state', label: 'By State' },
+    { key: 'zip', label: 'By Zip' },
+  ];
+
+  const ModeToggle = (
+    <View style={styles.modeToggleRow}>
+      {SEARCH_MODES.map(m => {
+        const active = searchMode === m.key;
+        return (
+          <TouchableOpacity
+            key={m.key}
+            onPress={() => setSearchMode(m.key)}
+            activeOpacity={0.8}
+            style={[
+              styles.modeBtn,
+              { backgroundColor: active ? colors.primary : colors.surfaceContainerHigh },
+            ]}
+          >
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: active ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700' },
+              ]}
+            >
+              {m.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const ModeControl =
+    searchMode === 'state' ? (
+      <View style={styles.modeControl}>
+        <Dropdown
+          label="State"
+          options={US_STATES_FOR_SEARCH}
+          value={selectedState}
+          onSelect={setSelectedState}
+        />
+      </View>
+    ) : searchMode === 'zip' ? (
+      <View style={styles.modeControl}>
+        <Input
+          label="Zip Code"
+          placeholder="Enter a 5-digit zip code"
+          value={zipInput}
+          onChangeText={(t) => {
+            setZipInput(t);
+            if (zipError) setZipError(null);
+          }}
+          keyboardType="number-pad"
+          maxLength={5}
+        />
+        {zipError && (
+          <Text style={[typography.bodySmall, { color: colors.error, marginTop: spacing.xs }]}>
+            {zipError}
+          </Text>
+        )}
+        <Button title="Search" onPress={handleZipSearch} style={{ marginTop: spacing.sm }} />
+      </View>
+    ) : null;
+
+  const sectionTitle =
+    searchMode === 'nearby'
+      ? 'Players Near You'
+      : searchMode === 'state'
+      ? (selectedState === 'ALL' ? 'Players Nationwide' : `Players in ${selectedStateLabel}`)
+      : activeZip
+      ? `Players Near ${activeZip}`
+      : 'Search by Zip Code';
 
   // ─── List Header ────────────────────────────────────────────────────
   const ListHeader = (
     <View>
+      {ModeToggle}
+      {ModeControl}
+
       {/* ── Section title + filter button ── */}
       <View style={styles.sectionRow}>
         <View>
           <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '800' }]}>
-            Players Near You
+            {sectionTitle}
           </Text>
           <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
             {players.length} match{players.length !== 1 ? 'es' : ''} found
@@ -350,10 +494,26 @@ export default function SearchScreen({ navigation }: any) {
   ) : !hasMore && allPlayers.length > 0 ? (
     <View style={styles.footerLoader}>
       <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
-        🎉 You've seen all nearby players!
+        🎉 You've seen all the matches!
       </Text>
     </View>
   ) : null;
+
+  // ─── Empty state (varies by mode) ─────────────────────────────────────
+  const ListEmpty = loading ? null : (
+    <View style={styles.emptyState}>
+      <MapPin size={40} color={colors.onSurfaceVariant} />
+      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.md, textAlign: 'center' }]}>
+        {searchMode === 'zip' && !activeZip
+          ? 'Enter a zip code above and tap Search to find players.'
+          : searchMode === 'state'
+          ? `No players found ${selectedState === 'ALL' ? 'nationwide' : `in ${selectedStateLabel}`} yet.`
+          : searchMode === 'zip'
+          ? `No players found near zip ${activeZip}.`
+          : 'No players found nearby yet.'}
+      </Text>
+    </View>
+  );
 
   if (initializing) {
     return (
@@ -366,17 +526,18 @@ export default function SearchScreen({ navigation }: any) {
     );
   }
 
-  if (locationMissing) {
+  if (searchMode === 'nearby' && locationMissing) {
     return (
       <ScreenWrapper>
         <Header showLogo showNotificationBell notificationCount={unreadCount} />
+        {ModeToggle}
         <View style={styles.centerState}>
           <MapPin size={48} color={colors.primary} />
           <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800', marginTop: spacing.lg, textAlign: 'center' }]}>
             Add your location
           </Text>
           <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center' }]}>
-            We need your city, state, or zip code to show you pickleball players nearby.
+            We need your city, state, or zip code to show you pickleball players nearby — or switch to "By State" or "By Zip" above.
           </Text>
           <TouchableOpacity
             style={[styles.completeProfileBtn, { backgroundColor: colors.primary }]}
@@ -416,6 +577,7 @@ export default function SearchScreen({ navigation }: any) {
         ListHeaderComponent={ListHeader}
         ListHeaderComponentStyle={styles.listHeader}
         ListFooterComponent={ListFooter}
+        ListEmptyComponent={ListEmpty}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
@@ -428,6 +590,7 @@ export default function SearchScreen({ navigation }: any) {
         filters={filters}
         onApply={handleApplyFilters}
         onClose={() => setShowFilter(false)}
+        mode={searchMode}
       />
     </ScreenWrapper>
   );
@@ -439,6 +602,27 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     paddingBottom: spacing.lg,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+  },
+  modeControl: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.massive,
   },
   sectionRow: {
     flexDirection: 'row',

@@ -79,6 +79,8 @@ const profileSchema = new mongoose.Schema(
 
 // Index for fast lookups by state + skill level (for matchmaking)
 profileSchema.index({ state: 1, skillLevel: 1 });
+// Index for exact zip-code search
+profileSchema.index({ zipCode: 1 });
 profileSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Profile', profileSchema);

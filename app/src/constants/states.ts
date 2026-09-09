@@ -25,3 +25,7 @@ export const US_STATES = [
   { label: 'Washington', value: 'WA' }, { label: 'West Virginia', value: 'WV' },
   { label: 'Wisconsin', value: 'WI' }, { label: 'Wyoming', value: 'WY' },
 ];
+
+// Only for the "search by state" UI — never used for a real user's own state.
+export const ALL_STATES_OPTION = { label: 'All States (Nationwide)', value: 'ALL' };
+export const US_STATES_FOR_SEARCH = [ALL_STATES_OPTION, ...US_STATES];

@@ -148,7 +148,33 @@ export default function CreateProfileScreen({ navigation }: any) {
     }
   };
 
+  const ZIP_REGEX = /^\d{5}$/;
+
+  const validateStep = (currentStep: number): boolean => {
+    if (currentStep === 2) {
+      if (!profile.state) {
+        Alert.alert('Missing Info', 'Please select your state.');
+        return false;
+      }
+      if (!profile.city.trim()) {
+        Alert.alert('Missing Info', 'Please enter your city.');
+        return false;
+      }
+      if (profile.zipCode && !ZIP_REGEX.test(profile.zipCode.trim())) {
+        Alert.alert('Invalid Zip Code', 'Please enter a valid 5-digit zip code, or leave it blank.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateStep(step)) return;
+    setStep(step + 1);
+  };
+
   const handleComplete = async () => {
+    if (!validateStep(step)) return;
     setLoading(true);
     try {
       await profileApi.updateProfile(profile);
@@ -434,7 +460,7 @@ export default function CreateProfileScreen({ navigation }: any) {
           )}
           <Button
             title={step === TOTAL_STEPS ? 'COMPLETE PROFILE' : 'NEXT'}
-            onPress={step === TOTAL_STEPS ? handleComplete : () => setStep(step + 1)}
+            onPress={step === TOTAL_STEPS ? handleComplete : handleNext}
             loading={step === TOTAL_STEPS && loading}
             icon={
               step < TOTAL_STEPS ? (

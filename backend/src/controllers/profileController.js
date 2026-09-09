@@ -39,6 +39,10 @@ const updateMyProfile = async (req, res) => {
     const { phone, avatar, bio, skillLevel, ageRange, state, city, zipCode, availability, playStyle, latitude, longitude, name } =
       req.body;
 
+    if (zipCode && !/^\d{5}$/.test(String(zipCode))) {
+      return res.status(400).json({ success: false, message: 'zipCode must be a 5-digit US zip code' });
+    }
+
     if (name) {
       await User.findByIdAndUpdate(req.user._id, { name });
     }
