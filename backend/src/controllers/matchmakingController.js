@@ -98,8 +98,13 @@ const getNearbyPlayers = async (req, res) => {
       page = hasMore ? results.slice(0, limitNum) : results;
     }
 
-    // Hydrate + populate user details for client display
-    const profiles = await Profile.populate(page, { path: 'user', select: 'name email avatar emailVerified' });
+    // Hydrate + populate user details for client display. Drop orphaned
+    // profiles whose referenced user no longer exists — $geoNear (nearby
+    // mode) silently excludes these since they also tend to lack a
+    // `location`, but the plain find() used for state/zip search doesn't.
+    const profiles = (
+      await Profile.populate(page, { path: 'user', select: 'name email avatar emailVerified' })
+    ).filter((p) => p.user);
 
     // Fetch conversation statuses
     const conversations = await Conversation.find({
@@ -135,7 +140,10 @@ const getNearbyPlayers = async (req, res) => {
         };
       }),
       hasMore,
-      nextOffset: offsetNum + profiles.length,
+      // Based on the raw DB page size (before dropping orphaned profiles
+      // above) so pagination stays aligned with what's actually been
+      // consumed from the collection.
+      nextOffset: offsetNum + page.length,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
