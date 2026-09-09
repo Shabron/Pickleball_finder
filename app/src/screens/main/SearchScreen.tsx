@@ -23,13 +23,12 @@ import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Dropdown from '../../components/common/Dropdown';
 import Input from '../../components/common/Input';
-import Button from '../../components/common/Button';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
 import PlayerMapMarker from '../../components/PlayerMapMarker';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, borderRadius } from '../../theme/spacing';
-import { SlidersHorizontal, MapPin } from 'lucide-react-native';
+import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { SlidersHorizontal, MapPin, Search } from 'lucide-react-native';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 import { US_STATES_FOR_SEARCH } from '../../constants/states';
 
@@ -170,10 +169,11 @@ export default function SearchScreen({ navigation }: any) {
             name: p.user?.name || 'Unknown',
             level: p.skillLevel || 'N/A',
             distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
+            city: p.city || undefined,
+            state: p.state || undefined,
             avatarUri: p.user?.avatar || undefined,
             matchScore: p.matchScore,
             playStyle: p.playStyle || 'Any',
-            bio: p.bio || '',
             age: p.age || undefined,
             connectionStatus: p.connectionStatus || 'none',
             conversationId: p.conversationId,
@@ -347,8 +347,14 @@ export default function SearchScreen({ navigation }: any) {
   const ModeControl =
     searchMode === 'state' ? (
       <View style={styles.modeControl}>
+        <View style={styles.controlHeadingRow}>
+          <MapPin size={18} color={colors.primary} />
+          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800', marginLeft: 6 }]}>
+            Search by State
+          </Text>
+        </View>
         <Dropdown
-          label="State"
+          placeholder="Select a state"
           options={US_STATES_FOR_SEARCH}
           value={selectedState}
           onSelect={setSelectedState}
@@ -356,34 +362,41 @@ export default function SearchScreen({ navigation }: any) {
       </View>
     ) : searchMode === 'zip' ? (
       <View style={styles.modeControl}>
-        <Input
-          label="Zip Code"
-          placeholder="Enter a 5-digit zip code"
-          value={zipInput}
-          onChangeText={(t) => {
-            setZipInput(t);
-            if (zipError) setZipError(null);
-          }}
-          keyboardType="number-pad"
-          maxLength={5}
-        />
+        <View style={styles.controlHeadingRow}>
+          <MapPin size={18} color={colors.primary} />
+          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800', marginLeft: 6 }]}>
+            Search by Zip Code
+          </Text>
+        </View>
+        <View style={styles.zipRow}>
+          <Input
+            placeholder="Enter a 5-digit zip code"
+            value={zipInput}
+            onChangeText={(t) => {
+              setZipInput(t);
+              if (zipError) setZipError(null);
+            }}
+            keyboardType="number-pad"
+            maxLength={5}
+            containerStyle={{ flex: 1 }}
+            onSubmitEditing={handleZipSearch}
+            returnKeyType="search"
+          />
+          <TouchableOpacity
+            onPress={handleZipSearch}
+            activeOpacity={0.8}
+            style={[styles.zipSearchBtn, { backgroundColor: colors.primary }]}
+          >
+            <Search size={22} color={colors.onPrimary} />
+          </TouchableOpacity>
+        </View>
         {zipError && (
           <Text style={[typography.bodySmall, { color: colors.error, marginTop: spacing.xs }]}>
             {zipError}
           </Text>
         )}
-        <Button title="Search" onPress={handleZipSearch} style={{ marginTop: spacing.sm }} />
       </View>
     ) : null;
-
-  const sectionTitle =
-    searchMode === 'nearby'
-      ? 'Players Near You'
-      : searchMode === 'state'
-      ? (selectedState === 'ALL' ? 'Players Nationwide' : `Players in ${selectedStateLabel}`)
-      : activeZip
-      ? `Players Near ${activeZip}`
-      : 'Search by Zip Code';
 
   // ─── List Header ────────────────────────────────────────────────────
   const ListHeader = (
@@ -391,16 +404,11 @@ export default function SearchScreen({ navigation }: any) {
       {ModeToggle}
       {ModeControl}
 
-      {/* ── Section title + filter button ── */}
+      {/* ── Match count + filter button ── */}
       <View style={styles.sectionRow}>
-        <View>
-          <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '800' }]}>
-            {sectionTitle}
-          </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
-            {players.length} match{players.length !== 1 ? 'es' : ''} found
-          </Text>
-        </View>
+        <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800' }]}>
+          {players.length} match{players.length !== 1 ? 'es' : ''} found
+        </Text>
         <TouchableOpacity
           style={[styles.filterBtn, { backgroundColor: activeFilterCount > 0 ? colors.primary : colors.primaryContainer }]}
           activeOpacity={0.7}
@@ -473,13 +481,6 @@ export default function SearchScreen({ navigation }: any) {
       </View>
       )}
 
-      {/* ── Matches heading ── */}
-      <View style={styles.matchesHeading}>
-        <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800' }]}>
-          Suggested Matches
-        </Text>
-        <View style={[styles.headingAccent, { backgroundColor: colors.brandGreen }]} />
-      </View>
     </View>
   );
 
@@ -619,6 +620,23 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.lg,
   },
+  controlHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  zipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  zipSearchBtn: {
+    width: sizes.touchTarget,
+    height: sizes.touchTarget,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
@@ -688,16 +706,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
-  },
-  matchesHeading: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  headingAccent: {
-    width: 36,
-    height: 3,
-    borderRadius: borderRadius.full,
-    marginTop: 6,
   },
   footerLoader: {
     alignItems: 'center',

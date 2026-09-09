@@ -33,6 +33,7 @@ import Avatar from '../../components/common/Avatar';
 import ReportBlockSheet from '../../components/ReportBlockSheet';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { getSkillLevelLabel } from '../../constants/skillLevels';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AVATAR_SIZE = SCREEN_WIDTH * 0.38;
@@ -239,7 +240,7 @@ export default function UserProfileScreen({ navigation, route }: any) {
           {/* Skill level */}
           <View style={[styles.levelChip, { backgroundColor: colors.primaryContainer }]}>
             <Text style={[typography.labelMedium, { color: colors.onPrimaryContainer, fontWeight: '700' }]}>
-              🏓 Level {player.level}
+              🏓 Level {getSkillLevelLabel(player.level)}
             </Text>
           </View>
 
