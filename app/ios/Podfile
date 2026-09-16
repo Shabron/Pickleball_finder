@@ -24,6 +24,11 @@ end
 target 'PickleballApp' do
   config = use_native_modules!
 
+  # react-native-maps with PROVIDER_GOOGLE on iOS needs the native Google
+  # Maps SDK pod; GMSServices.provideAPIKey(...) in AppDelegate.swift wires
+  # up the actual key.
+  pod 'GoogleMaps'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

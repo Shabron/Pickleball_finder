@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar } = require('../controllers/profileController');
+const { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar, reverseGeocode } = require('../controllers/profileController');
 const multer = require('multer');
 const path = require('path');
 
@@ -29,6 +29,10 @@ router.post('/me/avatar', protect, upload.single('avatar'), uploadAvatar);
 
 // DELETE /api/profile/me — delete my profile
 router.delete('/me', protect, deleteMyProfile);
+
+// GET /api/profile/reverse-geocode — resolve GPS coords to city/state/zip
+// (must be registered before the /:userId catch-all below)
+router.get('/reverse-geocode', protect, reverseGeocode);
 
 // GET /api/profile/:userId — view another user's profile
 router.get('/:userId', protect, getProfileByUserId);

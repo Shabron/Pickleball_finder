@@ -26,6 +26,7 @@ import Button from '../../components/common/Button';
 import Dropdown from '../../components/common/Dropdown';
 import Avatar from '../../components/common/Avatar';
 import Badge from '../../components/common/Badge';
+import LocationAutofillButton, { LocatedResult } from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { US_STATES } from '../../constants/states';
@@ -71,6 +72,8 @@ export default function EditProfileScreen({ navigation }: any) {
     state: '',
     city: '',
     zipCode: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     availability: {} as Record<string, { start: string; end: string }>,
   });
   const [avatarUri, setAvatarUri] = useState<string | undefined>(undefined);
@@ -92,6 +95,8 @@ export default function EditProfileScreen({ navigation }: any) {
           state: data?.state || '',
           city: data?.city || '',
           zipCode: data?.zipCode || '',
+          latitude: undefined,
+          longitude: undefined,
           availability: data?.availability || {},
         });
         if (data?.avatar) {
@@ -108,6 +113,17 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const updateField = (field: string, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLocated = (result: LocatedResult) => {
+    setProfile((prev) => ({
+      ...prev,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      state: result.state || prev.state,
+      city: result.city || prev.city,
+      zipCode: result.zipCode || prev.zipCode,
+    }));
   };
 
   const toggleDay = (day: string) => {
@@ -342,6 +358,8 @@ export default function EditProfileScreen({ navigation }: any) {
           <Text style={[typography.titleLarge, { color: colors.onSurface, marginBottom: spacing.lg }]}>
             Location
           </Text>
+
+          <LocationAutofillButton onLocated={handleLocated} style={{ marginBottom: spacing.lg }} />
 
           <Dropdown
             label="State"

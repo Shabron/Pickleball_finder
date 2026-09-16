@@ -4,7 +4,7 @@
  * Renders a circular avatar (initials or photo) with a colored ring
  * and a name label. Tap triggers a Callout with player details.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
 import { useTheme } from '../theme/ThemeContext';
@@ -28,6 +28,10 @@ interface PlayerMapMarkerProps {
 
 export default function PlayerMapMarker({ player, onPress }: PlayerMapMarkerProps) {
   const { colors, typography } = useTheme();
+  // Starts true so the marker snapshot waits for the remote avatar image to
+  // actually load (a custom marker with tracksViewChanges=false from the
+  // start snapshots before the image arrives and never repaints).
+  const [tracksViewChanges, setTracksViewChanges] = useState(!!player.avatarUri);
 
   const initials = (() => {
     const parts = player.name.trim().split(/\s+/);
@@ -45,7 +49,7 @@ export default function PlayerMapMarker({ player, onPress }: PlayerMapMarkerProp
     <Marker
       coordinate={player.coordinate}
       onPress={() => onPress?.(player)}
-      tracksViewChanges={false}
+      tracksViewChanges={tracksViewChanges}
     >
       {/* Custom pin view */}
       <View style={styles.markerWrapper}>
@@ -60,6 +64,8 @@ export default function PlayerMapMarker({ player, onPress }: PlayerMapMarkerProp
               <Image
                 source={{ uri: player.avatarUri }}
                 style={styles.avatarImage}
+                onLoadEnd={() => setTracksViewChanges(false)}
+                onError={() => setTracksViewChanges(false)}
               />
             ) : (
               <Text style={[typography.labelMedium, { color: pinText, fontSize: 13, fontWeight: '700' }]}>

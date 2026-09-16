@@ -4,6 +4,7 @@ const Conversation = require('../models/Conversation');
 const Notification = require('../models/Notification');
 const { geocodeApprox } = require('../utils/geocode');
 const { computeMatchScore, haversineKm } = require('../utils/matchScore');
+const zipcodes = require('zipcodes');
 
 // @desc    Get my profile
 // @route   GET /api/profile/me
@@ -47,6 +48,8 @@ const updateMyProfile = async (req, res) => {
       await User.findByIdAndUpdate(req.user._id, { name });
     }
 
+    const existingProfile = await Profile.findOne({ user: req.user._id });
+
     let location;
     if (latitude !== undefined || longitude !== undefined) {
       const latNum = Number(latitude);
@@ -60,12 +63,23 @@ const updateMyProfile = async (req, res) => {
       }
 
       location = { type: 'Point', coordinates: [lngNum, latNum] };
-    } else if (zipCode || (city && state)) {
-      // No precise GPS coordinates supplied — fall back to an approximate
-      // point derived from the zip/city/state the user already entered.
-      const approx = geocodeApprox({ zipCode, city, state });
-      if (approx) {
-        location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+    } else {
+      // No precise GPS coordinates in this request. Only recompute the
+      // approximate point if the zip/city/state actually changed (or this
+      // is a brand-new profile) — otherwise leave `location` untouched so a
+      // previously-captured precise GPS point isn't silently downgraded to
+      // a coarse zip-centroid approximation on every unrelated profile edit.
+      const locationFieldsChanged =
+        !existingProfile ||
+        (zipCode !== undefined && zipCode !== existingProfile.zipCode) ||
+        (city !== undefined && city !== existingProfile.city) ||
+        (state !== undefined && state !== existingProfile.state);
+
+      if (locationFieldsChanged && (zipCode || (city && state))) {
+        const approx = geocodeApprox({ zipCode, city, state });
+        if (approx) {
+          location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+        }
       }
     }
 
@@ -90,7 +104,7 @@ const updateMyProfile = async (req, res) => {
       if (profileFields[key] === undefined) delete profileFields[key];
     });
 
-    let profile = await Profile.findOne({ user: req.user._id });
+    let profile = existingProfile;
 
     let isNewlyCompleted = false;
 
@@ -186,6 +200,60 @@ const getProfileByUserId = async (req, res) => {
   }
 };
 
+// zipcodes.lookupByCoords always returns the *nearest* entry in its offline
+// US dataset, with no distance cutoff — for a coordinate outside the US
+// (or in the ocean) it will still confidently return some far-away US zip.
+// Reject matches further than this from the query point so non-US/no-fix
+// coordinates come back as `data: null` instead of a bogus suggestion.
+const REVERSE_GEOCODE_MAX_KM = 100;
+
+// Military/diplomatic mail "states" (Armed Forces Europe/Americas/Pacific)
+// carry real-world coordinates near embassies/bases abroad, which can be
+// deceptively close to a real foreign city (e.g. an AE zip sitting right at
+// the US Embassy in London). They aren't options in the app's state
+// dropdown, so never suggest them.
+const NON_STATE_CODES = new Set(['AA', 'AE', 'AP']);
+
+// @desc    Resolve device coordinates to a city/state/zip suggestion
+// @route   GET /api/profile/reverse-geocode?lat=&lng=
+// @access  Private
+// Read-only — never touches the DB, so it's safe to call mid-onboarding
+// without prematurely marking the profile complete (see updateMyProfile).
+const reverseGeocode = async (req, res) => {
+  try {
+    const latNum = Number(req.query.lat);
+    const lngNum = Number(req.query.lng);
+
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      return res.status(400).json({ success: false, message: 'lat and lng must be numbers' });
+    }
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return res.status(400).json({ success: false, message: 'lat/lng are out of range' });
+    }
+
+    const match = zipcodes.lookupByCoords(latNum, lngNum);
+    const distanceKm = match
+      ? haversineKm([lngNum, latNum], [match.longitude, match.latitude])
+      : null;
+
+    if (
+      !match ||
+      distanceKm == null ||
+      distanceKm > REVERSE_GEOCODE_MAX_KM ||
+      NON_STATE_CODES.has(match.state)
+    ) {
+      return res.status(200).json({ success: true, data: null });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { city: match.city, state: match.state, zipCode: match.zip },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Delete my profile
 // @route   DELETE /api/profile/me
 // @access  Private
@@ -228,4 +296,4 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-module.exports = { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar };
+module.exports = { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar, reverseGeocode };

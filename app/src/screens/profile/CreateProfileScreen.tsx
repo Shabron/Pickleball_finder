@@ -26,6 +26,7 @@ import Dropdown from '../../components/common/Dropdown';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
+import LocationAutofillButton, { LocatedResult } from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 import { profileApi } from '../../services/api';
@@ -74,6 +75,8 @@ export default function CreateProfileScreen({ navigation }: any) {
     state: '',
     city: '',
     zipCode: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     availability: {} as Record<string, { start: string; end: string }>,
   });
   const [loading, setLoading] = useState(false);
@@ -82,6 +85,17 @@ export default function CreateProfileScreen({ navigation }: any) {
 
   const updateField = (field: string, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLocated = (result: LocatedResult) => {
+    setProfile((prev) => ({
+      ...prev,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      state: result.state || prev.state,
+      city: result.city || prev.city,
+      zipCode: result.zipCode || prev.zipCode,
+    }));
   };
 
   const toggleDay = (day: string) => {
@@ -286,6 +300,8 @@ export default function CreateProfileScreen({ navigation }: any) {
               <Text style={[typography.headlineSmall, { color: colors.onSurface, marginBottom: spacing.xl }]}>
                 Where Do You Play?
               </Text>
+
+              <LocationAutofillButton onLocated={handleLocated} style={{ marginBottom: spacing.xl }} />
 
               <Dropdown
                 label="State"

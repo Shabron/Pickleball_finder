@@ -7,18 +7,17 @@
  *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
  *  - onEndReached fetches the next page of nearby players from the API
  */
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  Dimensions,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import MapView from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Dropdown from '../../components/common/Dropdown';
@@ -26,32 +25,22 @@ import Input from '../../components/common/Input';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
 import PlayerMapMarker from '../../components/PlayerMapMarker';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
+import LocationAutofillButton from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { SlidersHorizontal, MapPin, Search } from 'lucide-react-native';
+import { SlidersHorizontal, MapPin, Search, List, Map as MapIcon } from 'lucide-react-native';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 import { US_STATES_FOR_SEARCH } from '../../constants/states';
+import { getSkillLevelLabel } from '../../constants/skillLevels';
 
 type SearchMode = 'nearby' | 'state' | 'zip';
+type ViewMode = 'list' | 'map';
 const ZIP_REGEX = /^\d{5}$/;
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Decorative fallback only — used to center the (currently disabled) map
-// placeholder before the user's real profile location has loaded. Never
-// used for the nearby-players API call, which requires a real location.
+// Decorative fallback only — used to center the map before the user's real
+// profile location has loaded. Never used for the nearby-players API call,
+// which requires a real location.
 const DEFAULT_MAP_REGION = { latitude: 39.8283, longitude: -98.5795 };
-
-// ─── Nearby players preview (used in map placeholder) ────────────────────────
-// No real coordinate here — these are only a fallback for when the API
-// hasn't returned data yet, so they're never plotted on the map.
-
-const NEARBY_PREVIEW: PlayerProfileData[] = [
-  { id: '1', name: 'Arthur S.', level: '3.0', distance: '1.2 mi', avatarUri: 'https://randomuser.me/api/portraits/men/67.jpg' },
-  { id: '2', name: 'Betty L.', level: '3.5', distance: '2.5 mi', avatarUri: 'https://randomuser.me/api/portraits/women/52.jpg' },
-  { id: '3', name: 'Clara M.', level: '2.5', distance: '0.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/71.jpg' },
-  { id: '5', name: 'Eleanor R.', level: '3.0', distance: '1.8 mi', avatarUri: 'https://randomuser.me/api/portraits/women/68.jpg' },
-];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -65,6 +54,8 @@ export default function SearchScreen({ navigation }: any) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [locationMissing, setLocationMissing] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const mapRef = useRef<MapView>(null);
 
   // ── Search mode (Nearby / By State / By Zip) ──────────────────────────
   const [searchMode, setSearchMode] = useState<SearchMode>('nearby');
@@ -246,8 +237,6 @@ export default function SearchScreen({ navigation }: any) {
     }
   };
 
-  const nearbyPreview = allPlayers.length > 0 ? allPlayers.slice(0, 4) : NEARBY_PREVIEW;
-
   // Filter state
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -289,6 +278,27 @@ export default function SearchScreen({ navigation }: any) {
   }, [allPlayers, filters, searchMode]);
 
   const handleApplyFilters = useCallback((f: FilterState) => setFilters(f), []);
+
+  // Coordinates to plot — every currently-filtered result that has a known
+  // location (profiles carry an approximate location even in state/zip
+  // search, from their own zip at save time, so the map works in all three
+  // modes, not just Nearby).
+  const mapPlayers = useMemo(() => players.filter(p => p.coordinate), [players]);
+
+  // Re-frame the camera to fit all plotted pins (plus the user's own
+  // position in Nearby mode) whenever the map is visible and the result set
+  // changes — the map previously only ever used a fixed initialRegion, so it
+  // never re-centered once userLocation resolved asynchronously.
+  useEffect(() => {
+    if (viewMode !== 'map') return;
+    const coords = mapPlayers.map(p => p.coordinate!);
+    if (searchMode === 'nearby' && userLocation) coords.push(userLocation);
+    if (coords.length === 0) return;
+    mapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+      animated: true,
+    });
+  }, [viewMode, mapPlayers, searchMode, userLocation]);
 
   const handleLoadMore = useCallback(() => {
     if (loadingMore || loading || !hasMore) return;
@@ -398,11 +408,65 @@ export default function SearchScreen({ navigation }: any) {
       </View>
     ) : null;
 
-  // ─── List Header ────────────────────────────────────────────────────
-  const ListHeader = (
+  // Live location refresh for Nearby mode — same reusable component used in
+  // onboarding/profile edit. Anchors the mode=nearby query to a fresh GPS
+  // fix instead of whatever was last saved on the profile.
+  const NearbyLocationRefresh =
+    searchMode === 'nearby' ? (
+      <View style={styles.modeControl}>
+        <LocationAutofillButton
+          label="📍 Update My Location"
+          onLocated={(result) => {
+            setUserLocation({ latitude: result.latitude, longitude: result.longitude });
+            setLocationMissing(false);
+          }}
+        />
+      </View>
+    ) : null;
+
+  // ─── List / Map view toggle ────────────────────────────────────────
+  const ViewToggle = (
+    <View style={styles.viewToggleRow}>
+      {(['list', 'map'] as ViewMode[]).map(v => {
+        const active = viewMode === v;
+        return (
+          <TouchableOpacity
+            key={v}
+            onPress={() => setViewMode(v)}
+            activeOpacity={0.8}
+            style={[
+              styles.viewToggleBtn,
+              { backgroundColor: active ? colors.primary : colors.surfaceContainerHigh },
+            ]}
+          >
+            {v === 'list' ? (
+              <List size={16} color={active ? colors.onPrimary : colors.onSurfaceVariant} />
+            ) : (
+              <MapIcon size={16} color={active ? colors.onPrimary : colors.onSurfaceVariant} />
+            )}
+            <Text
+              style={[
+                typography.labelMedium,
+                { color: active ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700', marginLeft: 6 },
+              ]}
+            >
+              {v === 'list' ? 'List' : 'Map'}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  // ─── Top controls (mode toggle, mode-specific control, view toggle) ──
+  // Rendered directly above the FlatList/Map, not scrolled away with the
+  // list content — both List and Map view need them visible at all times.
+  const TopControls = (
     <View>
       {ModeToggle}
       {ModeControl}
+      {NearbyLocationRefresh}
+      {ViewToggle}
 
       {/* ── Match count + filter button ── */}
       <View style={styles.sectionRow}>
@@ -420,67 +484,63 @@ export default function SearchScreen({ navigation }: any) {
           </Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
 
-      {/* ── Nearby players map (Disabled for now) ── */}
-      {false && (
-      <View
-        style={[
-          styles.mapPlaceholder,
-          {
-            backgroundColor: colors.surfaceContainerHigh,
-            borderBottomWidth: 3,
-            borderBottomColor: colors.brandGreen,
-          },
-        ]}
+  // ─── Map pane (shown instead of the list when viewMode === 'map') ────
+  const MapPane = (
+    <View style={styles.mapPane}>
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={{
+          ...(userLocation ?? DEFAULT_MAP_REGION),
+          latitudeDelta: 0.15,
+          longitudeDelta: 0.15,
+        }}
       >
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            ...(userLocation ?? DEFAULT_MAP_REGION),
-            latitudeDelta: 0.15,
-            longitudeDelta: 0.15,
-          }}
-        >
-          {/* "You" pin */}
+        {/* "You" pin — only meaningful in Nearby mode, where it's the search anchor */}
+        {searchMode === 'nearby' && userLocation && (
           <PlayerMapMarker
-            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: userLocation ?? DEFAULT_MAP_REGION, isCurrentUser: true }}
+            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: userLocation, isCurrentUser: true }}
           />
+        )}
 
-          {/* Player pins — only players with a known (approximate) location */}
-          {nearbyPreview
-            .filter(p => p.coordinate)
-            .map(p => (
-              <PlayerMapMarker
-                key={p.id}
-                player={{
-                  id: p.id,
-                  name: p.name,
-                  level: p.level || '',
-                  distance: p.distance,
-                  coordinate: p.coordinate!,
-                  avatarUri: p.avatarUri,
-                }}
-                onPress={() => navigation.navigate('UserProfile', { userId: p.id })}
-              />
-            ))}
-        </MapView>
+        {/* Every currently-filtered result with a known location */}
+        {mapPlayers.map(p => (
+          <PlayerMapMarker
+            key={p.id}
+            player={{
+              id: p.id,
+              name: p.name,
+              level: getSkillLevelLabel(p.level),
+              distance: p.distance,
+              coordinate: p.coordinate!,
+              avatarUri: p.avatarUri,
+            }}
+            onPress={() => navigation.navigate('UserProfile', { userId: p.id })}
+          />
+        ))}
+      </MapView>
 
-        {/* LIVE badge */}
-        <View style={[styles.liveBadge, { backgroundColor: colors.surfaceContainerLowest }]}>
-          <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
-          <Text style={[typography.labelSmall, { color: colors.onSurface, fontWeight: '600' }]}>LIVE</Text>
-        </View>
+      {/* Player count pill */}
+      <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
+        <MapPin size={12} color={colors.onPrimary} />
+        <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700', marginLeft: 4 }]}>
+          {mapPlayers.length} player{mapPlayers.length !== 1 ? 's' : ''} on map
+        </Text>
+      </View>
 
-        {/* Player count pill */}
-        <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
-          <MapPin size={12} color={colors.onPrimary} />
-          <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700', marginLeft: 4 }]}>
-            {nearbyPreview.length} players nearby
+      {!loading && mapPlayers.length === 0 && (
+        <View style={styles.mapEmptyBanner}>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
+            {searchMode === 'zip' && !activeZip
+              ? 'Enter a zip code above to find players.'
+              : 'No players to show on the map yet.'}
           </Text>
         </View>
-      </View>
       )}
-
     </View>
   );
 
@@ -564,26 +624,30 @@ export default function SearchScreen({ navigation }: any) {
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
 
-      <FlatList
-        style={{ flex: 1 }}
-        data={players}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <PlayerProfileCard
-            player={item}
-            onConnect={() => handleConnect(item)}
-            onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
-          />
-        )}
-        ListHeaderComponent={ListHeader}
-        ListHeaderComponentStyle={styles.listHeader}
-        ListFooterComponent={ListFooter}
-        ListEmptyComponent={ListEmpty}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.4}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.flatListContent}
-      />
+      {TopControls}
+
+      {viewMode === 'map' ? (
+        MapPane
+      ) : (
+        <FlatList
+          style={{ flex: 1 }}
+          data={players}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <PlayerProfileCard
+              player={item}
+              onConnect={() => handleConnect(item)}
+              onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
+            />
+          )}
+          ListFooterComponent={ListFooter}
+          ListEmptyComponent={ListEmpty}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.flatListContent}
+        />
+      )}
 
       {/* ── Filter Bottom Sheet ── */}
       <FilterBottomSheet
@@ -600,9 +664,6 @@ export default function SearchScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   flatListContent: {
     paddingBottom: 100,
-  },
-  listHeader: {
-    paddingBottom: spacing.lg,
   },
   modeToggleRow: {
     flexDirection: 'row',
@@ -637,6 +698,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  viewToggleRow: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
@@ -658,37 +733,26 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   // ── Map ──────────────────────────────────────────────────────────────
-  mapPlaceholder: {
-    height: SCREEN_HEIGHT * 0.34,
-    marginHorizontal: spacing.lg,
-    borderRadius: borderRadius.xxl,
-    overflow: 'hidden',
-    marginBottom: spacing.xl,
+  mapPane: {
+    flex: 1,
     position: 'relative',
   },
   map: {
     flex: 1,
   },
-  liveBadge: {
+  mapEmptyBanner: {
     position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
+    top: spacing.xl,
+    left: spacing.xl,
+    right: spacing.xl,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 3,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 5,
   },
   countPill: {
     position: 'absolute',

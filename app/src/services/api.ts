@@ -284,6 +284,33 @@ export const profileApi = {
     }
   },
 
+  reverseGeocode: async (latitude: number, longitude: number) => {
+    try {
+      const token = await getToken();
+      const queryParams = new URLSearchParams({
+        lat: latitude.toString(),
+        lng: longitude.toString(),
+      });
+      const response = await fetch(`${API_BASE_URL}/profile/reverse-geocode?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to resolve location');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Reverse geocode error:', error);
+      throw error;
+    }
+  },
+
   updateProfile: async (data: any) => {
     try {
       const token = await getToken();
