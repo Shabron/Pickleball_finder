@@ -282,11 +282,17 @@ const uploadAvatar = async (req, res) => {
 
     const avatarUrl = `/uploads/${req.file.filename}`;
 
-    let profile = await Profile.findOne({ user: req.user._id });
-    if (profile) {
-      profile.avatar = avatarUrl;
-      await profile.save();
-    } else {
+    // $set + findOneAndUpdate only touches `avatar` — unlike profile.save(),
+    // it doesn't re-validate every other field already on the document. A
+    // profile.save() here would fail (as it did) for any profile carrying
+    // legacy values that predate the current skillLevel/playStyle enums,
+    // even though this endpoint never touches those fields.
+    let profile = await Profile.findOneAndUpdate(
+      { user: req.user._id },
+      { $set: { avatar: avatarUrl } },
+      { new: true, upsert: false }
+    );
+    if (!profile) {
       profile = await Profile.create({ user: req.user._id, avatar: avatarUrl, profileComplete: false });
     }
 
