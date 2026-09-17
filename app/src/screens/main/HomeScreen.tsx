@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { postApi, messageApi, profileApi } from '../../services/api';
+import { postApi, messageApi, profileApi, getAvatarUrl } from '../../services/api';
 import { ensurePushRegistration } from '../../services/push';
 import { Plus } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
@@ -164,6 +164,7 @@ export default function HomeScreen({ navigation }: any) {
                 location: `${item.city ? item.city + ', ' : ''}${item.state}${
                   item.distanceKm != null ? ` · ${(item.distanceKm * 0.621371).toFixed(1)} mi away` : ''
                 }`,
+                avatarUri: getAvatarUrl(item.author?.avatar),
               }}
               initialSaved={savedPostIds.has(item._id)}
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}

@@ -15,6 +15,15 @@ export const clearToken = async () => {
   await AsyncStorage.removeItem(TOKEN_KEY);
 };
 
+/**
+ * Avatars (Profile.avatar / User-shaped author/participant objects with an
+ * .avatar field attached by the backend) are always stored as a relative
+ * "/uploads/..." path — this resolves it to a URL the Image component can
+ * actually load.
+ */
+export const getAvatarUrl = (avatarPath?: string | null): string | undefined =>
+  avatarPath ? `${API_BASE_URL.replace(/\/api$/, '')}${avatarPath}` : undefined;
+
 export const authApi = {
   login: async (email: string, password: string) => {
     try {

@@ -102,8 +102,10 @@ const getNearbyPlayers = async (req, res) => {
     // profiles whose referenced user no longer exists — $geoNear (nearby
     // mode) silently excludes these since they also tend to lack a
     // `location`, but the plain find() used for state/zip search doesn't.
+    // Note: avatar lives on Profile itself, not User — it's already on
+    // each `page` document, nothing to populate for it here.
     const profiles = (
-      await Profile.populate(page, { path: 'user', select: 'name email avatar emailVerified' })
+      await Profile.populate(page, { path: 'user', select: 'name email emailVerified' })
     ).filter((p) => p.user);
 
     // Fetch conversation statuses

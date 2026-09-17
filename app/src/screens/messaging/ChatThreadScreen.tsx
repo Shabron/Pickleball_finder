@@ -24,7 +24,7 @@ import ReportBlockSheet from '../../components/ReportBlockSheet';
 import RatingSheet from '../../components/RatingSheet';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { messageApi } from '../../services/api';
+import { messageApi, profileApi, getAvatarUrl } from '../../services/api';
 
 interface Message {
   id: string;
@@ -52,8 +52,17 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   const [initiator, setInitiator] = useState<string>('');
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showRatingSheet, setShowRatingSheet] = useState(false);
+  const [partnerAvatarUri, setPartnerAvatarUri] = useState<string | undefined>(undefined);
   const flatListRef = useRef<FlatList>(null);
   const { colors, typography } = useTheme();
+
+  React.useEffect(() => {
+    if (!partnerId) return;
+    profileApi
+      .getProfileByUserId(partnerId)
+      .then((res) => setPartnerAvatarUri(getAvatarUrl(res?.data?.avatar)))
+      .catch((err) => console.error('Failed to fetch partner avatar:', err));
+  }, [partnerId]);
 
   React.useEffect(() => {
     if (conversationId) {
@@ -174,7 +183,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
             <ChevronLeft color={colors.onSurface} size={sizes.iconLarge} />
           </TouchableOpacity>
 
-          <Avatar name={partnerName} size={42} />
+          <Avatar name={partnerName} uri={partnerAvatarUri} size={42} />
 
           <View style={styles.headerInfo}>
             <Text style={[typography.titleSmall, { color: colors.onSurface }]}>

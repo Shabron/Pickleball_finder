@@ -19,6 +19,7 @@ import Header from '../../components/common/Header';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Dropdown from '../../components/common/Dropdown';
+import LocationAutofillButton, { LocatedResult } from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 import { postApi } from '../../services/api';
@@ -50,12 +51,24 @@ export default function CreatePostScreen({ navigation, route }: any) {
     city: post?.city || '',
     skillLevel: post?.skillLevel || '',
     playStyle: post?.playStyle || '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
   });
   const [loading, setLoading] = useState(false);
   const { colors, typography } = useTheme();
 
   const updateField = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLocated = (result: LocatedResult) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      state: result.state || prev.state,
+      city: result.city || prev.city,
+    }));
   };
 
   const isValid = formData.title.trim() && formData.description.trim() && formData.state;
@@ -116,6 +129,8 @@ export default function CreatePostScreen({ navigation, route }: any) {
             numberOfLines={5}
             containerStyle={{ marginBottom: spacing.lg }}
           />
+
+          <LocationAutofillButton onLocated={handleLocated} style={{ marginBottom: spacing.lg }} />
 
           <Dropdown
             label="State"

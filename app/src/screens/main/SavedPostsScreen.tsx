@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { postApi, messageApi } from '../../services/api';
+import { postApi, messageApi, getAvatarUrl } from '../../services/api';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import PartnerPostCard from '../../components/PartnerPostCard';
@@ -93,6 +93,7 @@ export default function SavedPostsScreen({ navigation }: any) {
                 content: item.description,
                 playStyle: item.playStyle,
                 location: `${item.city ? item.city + ', ' : ''}${item.state}`,
+                avatarUri: getAvatarUrl(item.author?.avatar),
               }}
               initialSaved
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}

@@ -15,7 +15,7 @@ import Input from '../../components/common/Input';
 import Avatar from '../../components/common/Avatar';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
-import { messageApi, profileApi } from '../../services/api';
+import { messageApi, profileApi, getAvatarUrl } from '../../services/api';
 
 interface ChatPreview {
   id: string; // conversationId
@@ -60,7 +60,7 @@ export default function MessagesListScreen({ navigation }: any) {
             timeAgo: new Date(conv.updatedAt).toLocaleDateString(), // Simple format for now
             message: conv.lastMessage?.content || 'Started a conversation',
             unreadCount: conv.unreadCount || 0,
-            avatarUri: undefined,
+            avatarUri: getAvatarUrl(otherParticipant?.avatar),
             status: conv.status,
             initiator: conv.initiator,
           };

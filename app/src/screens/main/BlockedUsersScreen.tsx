@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { safetyApi } from '../../services/api';
+import { safetyApi, getAvatarUrl } from '../../services/api';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
@@ -17,6 +17,7 @@ interface BlockedUser {
   _id: string;
   name: string;
   email: string;
+  avatar?: string;
 }
 
 export default function BlockedUsersScreen({ navigation }: any) {
@@ -82,7 +83,7 @@ export default function BlockedUsersScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={[styles.row, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-              <Avatar name={item.name} size={44} />
+              <Avatar name={item.name} uri={getAvatarUrl(item.avatar)} size={44} />
               <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600', flex: 1, marginLeft: spacing.md }]}>
                 {item.name}
               </Text>

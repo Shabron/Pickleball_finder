@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { ChevronDown, ChevronUp, Send, MessageCircle } from 'lucide-react-native';
 import Avatar from './common/Avatar';
-import { postApi, getToken } from '../services/api';
+import { postApi, getToken, getAvatarUrl } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius } from '../theme/spacing';
 
@@ -178,7 +178,7 @@ const InlineReplies = forwardRef<InlineRepliesHandle, InlineRepliesProps>(functi
               {/* Thread line connector */}
               <View style={[styles.threadLine, { backgroundColor: colors.outlineVariant }]} />
 
-              <Avatar name={reply.author?.name || '?'} size={30} />
+              <Avatar name={reply.author?.name || '?'} uri={getAvatarUrl(reply.author?.avatar)} size={30} />
 
               <View style={[styles.replyBubble, { backgroundColor: colors.surfaceContainerLow }]}>
                 <View style={styles.replyHeader}>

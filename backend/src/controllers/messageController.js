@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
 const User = require('../models/User');
 const { sendPushNotification } = require('../utils/push');
+const { attachAvatarsToUsers } = require('../utils/attachAvatars');
 
 // @desc    Get all conversations for the logged-in user
 // @route   GET /api/messages/conversations
@@ -31,6 +32,10 @@ const getConversations = async (req, res) => {
         };
       })
     );
+
+    // Batch-attach avatars (from Profile) to every participant across all
+    // conversations in one query, rather than one lookup per conversation.
+    await attachAvatarsToUsers(conversationsWithUnread.flatMap((c) => c.participants));
 
     res.status(200).json({
       success: true,

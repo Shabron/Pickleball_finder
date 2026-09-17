@@ -4,7 +4,8 @@ const SavedPost = require('../models/SavedPost');
 const Notification = require('../models/Notification');
 const Profile = require('../models/Profile');
 const { sendPushNotification } = require('../utils/push');
-const { geocodeApprox } = require('../utils/geocode');
+const { geocodeApprox, pointFromCoords } = require('../utils/geocode');
+const { attachAuthorAvatars } = require('../utils/attachAvatars');
 
 const removeUndefined = (obj) => {
   const cleaned = { ...obj };
@@ -74,7 +75,7 @@ const getPosts = async (req, res) => {
       ];
       total = combined.length;
       const page = combined.slice(skip, skip + limitNum);
-      posts = await Post.populate(page, { path: 'author', select: 'name email' });
+      posts = await Post.populate(page, { path: 'author', select: 'name email', options: { lean: true } });
     } else {
       // Viewer location unknown — fall back to newest-first, everywhere.
       total = await Post.countDocuments(filter);
@@ -82,8 +83,10 @@ const getPosts = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .populate('author', 'name email');
+        .populate('author', 'name email')
+        .lean();
     }
+    await attachAuthorAvatars(posts);
 
     return res.status(200).json({
       success: true,
@@ -107,7 +110,7 @@ const getPosts = async (req, res) => {
 // @access  Private
 const createPost = async (req, res) => {
   try {
-    const { title, description, state, city, skillLevel, playStyle, preferredTime, status } = req.body;
+    const { title, description, state, city, skillLevel, playStyle, preferredTime, status, latitude, longitude } = req.body;
 
     // Basic required validation
     if (!title || !description || !state) {
@@ -117,8 +120,17 @@ const createPost = async (req, res) => {
       });
     }
 
-    const approx = geocodeApprox({ city, state });
-    const location = approx ? { type: 'Point', coordinates: [approx.longitude, approx.latitude] } : undefined;
+    let location;
+    if (latitude !== undefined || longitude !== undefined) {
+      try {
+        location = pointFromCoords({ latitude, longitude });
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+    } else {
+      const approx = geocodeApprox({ city, state });
+      location = approx ? { type: 'Point', coordinates: [approx.longitude, approx.latitude] } : undefined;
+    }
 
     const postFields = removeUndefined({
       author: req.user._id,
@@ -136,7 +148,8 @@ const createPost = async (req, res) => {
     const post = await Post.create(postFields);
 
     // Populate author details for client display
-    const populatedPost = await Post.findById(post._id).populate('author', 'name email');
+    const populatedPost = await Post.findById(post._id).populate('author', 'name email').lean();
+    await attachAuthorAvatars(populatedPost);
 
     // Notification Logic for New Post Nearby
     try {
@@ -181,12 +194,32 @@ const createPost = async (req, res) => {
 // @access  Private
 const updatePost = async (req, res) => {
   try {
-    const { title, description, state, city, skillLevel, playStyle, preferredTime, status } = req.body;
+    const { title, description, state, city, skillLevel, playStyle, preferredTime, status, latitude, longitude } = req.body;
+
+    const existingPost = await Post.findOne({ _id: req.params.id, author: req.user._id });
+    if (!existingPost) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
 
     let location;
-    if (state || city) {
-      const approx = geocodeApprox({ city, state });
-      if (approx) location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+    if (latitude !== undefined || longitude !== undefined) {
+      try {
+        location = pointFromCoords({ latitude, longitude });
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+    } else {
+      // No precise coordinates in this request — only recompute the
+      // approximate point if state/city actually changed, so a precise GPS
+      // point captured earlier isn't silently downgraded on an unrelated
+      // edit (e.g. just changing the title).
+      const locationChanged =
+        (city !== undefined && city !== existingPost.city) ||
+        (state !== undefined && state !== existingPost.state);
+      if (locationChanged) {
+        const approx = geocodeApprox({ city, state });
+        if (approx) location = { type: 'Point', coordinates: [approx.longitude, approx.latitude] };
+      }
     }
 
     const postFields = removeUndefined({
@@ -205,11 +238,12 @@ const updatePost = async (req, res) => {
       { _id: req.params.id, author: req.user._id },
       { $set: postFields },
       { new: true }
-    ).populate('author', 'name email');
+    ).populate('author', 'name email').lean();
 
     if (!updatedPost) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
+    await attachAuthorAvatars(updatedPost);
 
     return res.status(200).json({
       success: true,
@@ -228,7 +262,9 @@ const getMyPosts = async (req, res) => {
   try {
     const posts = await Post.find({ author: req.user._id })
       .sort({ createdAt: -1 })
-      .populate('author', 'name email');
+      .populate('author', 'name email')
+      .lean();
+    await attachAuthorAvatars(posts);
 
     return res.status(200).json({
       success: true,
@@ -244,11 +280,12 @@ const getMyPosts = async (req, res) => {
 // @access  Public
 const getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('author', 'name email');
+    const post = await Post.findById(req.params.id).populate('author', 'name email').lean();
 
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
+    await attachAuthorAvatars(post);
 
     return res.status(200).json({
       success: true,
@@ -266,7 +303,9 @@ const getReplies = async (req, res) => {
   try {
     const replies = await Reply.find({ post: req.params.id })
       .sort({ createdAt: 1 })
-      .populate('author', 'name email');
+      .populate('author', 'name email')
+      .lean();
+    await attachAuthorAvatars(replies);
 
     return res.status(200).json({
       success: true,
@@ -299,7 +338,8 @@ const addReply = async (req, res) => {
       content: content.trim(),
     });
 
-    const populated = await Reply.findById(reply._id).populate('author', 'name email');
+    const populated = await Reply.findById(reply._id).populate('author', 'name email').lean();
+    await attachAuthorAvatars(populated);
 
     // Notification Logic for New Reply
     try {
@@ -381,9 +421,11 @@ const getSavedPosts = async (req, res) => {
       .populate({
         path: 'post',
         populate: { path: 'author', select: 'name email' },
-      });
+      })
+      .lean();
 
     const posts = savedPosts.map((s) => s.post).filter(Boolean);
+    await attachAuthorAvatars(posts);
 
     return res.status(200).json({
       success: true,

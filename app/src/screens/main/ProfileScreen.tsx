@@ -10,7 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
 import { profileApi, authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, LogOut, Info, ChevronRight, Bell, Edit, Shield, FileText, Trash2, Bookmark, Ban, BadgeCheck, Mail } from 'lucide-react-native';
+import { Settings, LogOut, Info, ChevronRight, Bell, Shield, FileText, Trash2, Bookmark, Ban, BadgeCheck, Mail } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
@@ -100,11 +100,6 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const menuItems = [
-    {
-      icon: <Edit size={sizes.iconSmall} color={colors.secondary} />,
-      label: 'Edit Profile',
-      onPress: () => navigation.navigate('EditProfile'),
-    },
     {
       icon: <Bookmark size={sizes.iconSmall} color={colors.primary} />,
       label: 'Saved Posts',

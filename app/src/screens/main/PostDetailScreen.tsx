@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { postApi, profileApi } from '../../services/api';
+import { postApi, profileApi, getAvatarUrl } from '../../services/api';
 import { MapPin, Clock, Target, Users as UsersIcon } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
@@ -100,7 +100,7 @@ export default function PostDetailScreen({ navigation, route }: any) {
         </Text>
         <Card elevation={1} padding={spacing.xl} style={{ marginBottom: spacing.xl, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.outlineVariant }}>
           <View style={styles.authorRow}>
-            <Avatar name={post.author.name} size={sizes.avatarLarge} uri={profile?.avatar} />
+            <Avatar name={post.author.name} size={sizes.avatarLarge} uri={getAvatarUrl(profile?.avatar)} />
             <View style={styles.authorInfo}>
               <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
                 {post.author.name}

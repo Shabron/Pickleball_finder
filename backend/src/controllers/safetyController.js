@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Report = require('../models/Report');
+const { attachAvatarsToUsers } = require('../utils/attachAvatars');
 
 const REPORT_REASONS = ['harassment', 'inappropriate_behavior', 'fake_profile', 'no_show', 'safety_concern', 'other'];
 
@@ -85,10 +86,10 @@ const unblockUser = async (req, res) => {
 // @access  Private
 const getBlockedUsers = async (req, res) => {
   try {
-    // Note: avatar lives on Profile, not User — the list screen falls back to
-    // initials-only avatars, consistent with how blocked users are shown elsewhere.
-    const user = await User.findById(req.user._id).populate('blockedUsers', 'name email');
-    return res.status(200).json({ success: true, data: user.blockedUsers || [] });
+    const user = await User.findById(req.user._id).populate('blockedUsers', 'name email').lean();
+    const blockedUsers = user.blockedUsers || [];
+    await attachAvatarsToUsers(blockedUsers);
+    return res.status(200).json({ success: true, data: blockedUsers });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

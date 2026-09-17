@@ -3,11 +3,11 @@
  *
  * Features:
  *  - App header with logo + "Senior Pickleball Partners" branding
- *  - Nearby players section with a live MapView of approximate locations
- *  - Vertical infinite-scroll FlatList of enlarged PlayerProfileCard components
+ *  - Nearby / By State / By Zip search modes
+ *  - Vertical infinite-scroll FlatList of PlayerProfileCard components
  *  - onEndReached fetches the next page of nearby players from the API
  */
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,30 +17,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Dropdown from '../../components/common/Dropdown';
 import Input from '../../components/common/Input';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
-import PlayerMapMarker from '../../components/PlayerMapMarker';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
 import LocationAutofillButton from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { SlidersHorizontal, MapPin, Search, List, Map as MapIcon } from 'lucide-react-native';
+import { SlidersHorizontal, MapPin, Search } from 'lucide-react-native';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
 import { US_STATES_FOR_SEARCH } from '../../constants/states';
-import { getSkillLevelLabel } from '../../constants/skillLevels';
+import { API_BASE_URL } from '@env';
+
+const AVATAR_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
 type SearchMode = 'nearby' | 'state' | 'zip';
-type ViewMode = 'list' | 'map';
 const ZIP_REGEX = /^\d{5}$/;
-
-// Decorative fallback only — used to center the map before the user's real
-// profile location has loaded. Never used for the nearby-players API call,
-// which requires a real location.
-const DEFAULT_MAP_REGION = { latitude: 39.8283, longitude: -98.5795 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -54,8 +48,6 @@ export default function SearchScreen({ navigation }: any) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [locationMissing, setLocationMissing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const mapRef = useRef<MapView>(null);
 
   // ── Search mode (Nearby / By State / By Zip) ──────────────────────────
   const [searchMode, setSearchMode] = useState<SearchMode>('nearby');
@@ -162,7 +154,9 @@ export default function SearchScreen({ navigation }: any) {
             distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
             city: p.city || undefined,
             state: p.state || undefined,
-            avatarUri: p.user?.avatar || undefined,
+            // avatar lives on the Profile document, not the populated user
+            // sub-object, and is stored as a relative "/uploads/..." path.
+            avatarUri: p.avatar ? `${AVATAR_BASE_URL}${p.avatar}` : undefined,
             matchScore: p.matchScore,
             playStyle: p.playStyle || 'Any',
             age: p.age || undefined,
@@ -278,27 +272,6 @@ export default function SearchScreen({ navigation }: any) {
   }, [allPlayers, filters, searchMode]);
 
   const handleApplyFilters = useCallback((f: FilterState) => setFilters(f), []);
-
-  // Coordinates to plot — every currently-filtered result that has a known
-  // location (profiles carry an approximate location even in state/zip
-  // search, from their own zip at save time, so the map works in all three
-  // modes, not just Nearby).
-  const mapPlayers = useMemo(() => players.filter(p => p.coordinate), [players]);
-
-  // Re-frame the camera to fit all plotted pins (plus the user's own
-  // position in Nearby mode) whenever the map is visible and the result set
-  // changes — the map previously only ever used a fixed initialRegion, so it
-  // never re-centered once userLocation resolved asynchronously.
-  useEffect(() => {
-    if (viewMode !== 'map') return;
-    const coords = mapPlayers.map(p => p.coordinate!);
-    if (searchMode === 'nearby' && userLocation) coords.push(userLocation);
-    if (coords.length === 0) return;
-    mapRef.current?.fitToCoordinates(coords, {
-      edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-      animated: true,
-    });
-  }, [viewMode, mapPlayers, searchMode, userLocation]);
 
   const handleLoadMore = useCallback(() => {
     if (loadingMore || loading || !hasMore) return;
@@ -424,49 +397,12 @@ export default function SearchScreen({ navigation }: any) {
       </View>
     ) : null;
 
-  // ─── List / Map view toggle ────────────────────────────────────────
-  const ViewToggle = (
-    <View style={styles.viewToggleRow}>
-      {(['list', 'map'] as ViewMode[]).map(v => {
-        const active = viewMode === v;
-        return (
-          <TouchableOpacity
-            key={v}
-            onPress={() => setViewMode(v)}
-            activeOpacity={0.8}
-            style={[
-              styles.viewToggleBtn,
-              { backgroundColor: active ? colors.primary : colors.surfaceContainerHigh },
-            ]}
-          >
-            {v === 'list' ? (
-              <List size={16} color={active ? colors.onPrimary : colors.onSurfaceVariant} />
-            ) : (
-              <MapIcon size={16} color={active ? colors.onPrimary : colors.onSurfaceVariant} />
-            )}
-            <Text
-              style={[
-                typography.labelMedium,
-                { color: active ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700', marginLeft: 6 },
-              ]}
-            >
-              {v === 'list' ? 'List' : 'Map'}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-
-  // ─── Top controls (mode toggle, mode-specific control, view toggle) ──
-  // Rendered directly above the FlatList/Map, not scrolled away with the
-  // list content — both List and Map view need them visible at all times.
+  // ─── Top controls (mode toggle, mode-specific control) ────────────────
   const TopControls = (
     <View>
       {ModeToggle}
       {ModeControl}
       {NearbyLocationRefresh}
-      {ViewToggle}
 
       {/* ── Match count + filter button ── */}
       <View style={styles.sectionRow}>
@@ -484,63 +420,6 @@ export default function SearchScreen({ navigation }: any) {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
-
-  // ─── Map pane (shown instead of the list when viewMode === 'map') ────
-  const MapPane = (
-    <View style={styles.mapPane}>
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        initialRegion={{
-          ...(userLocation ?? DEFAULT_MAP_REGION),
-          latitudeDelta: 0.15,
-          longitudeDelta: 0.15,
-        }}
-      >
-        {/* "You" pin — only meaningful in Nearby mode, where it's the search anchor */}
-        {searchMode === 'nearby' && userLocation && (
-          <PlayerMapMarker
-            player={{ id: 'me', name: 'You', level: '', distance: '', coordinate: userLocation, isCurrentUser: true }}
-          />
-        )}
-
-        {/* Every currently-filtered result with a known location */}
-        {mapPlayers.map(p => (
-          <PlayerMapMarker
-            key={p.id}
-            player={{
-              id: p.id,
-              name: p.name,
-              level: getSkillLevelLabel(p.level),
-              distance: p.distance,
-              coordinate: p.coordinate!,
-              avatarUri: p.avatarUri,
-            }}
-            onPress={() => navigation.navigate('UserProfile', { userId: p.id })}
-          />
-        ))}
-      </MapView>
-
-      {/* Player count pill */}
-      <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
-        <MapPin size={12} color={colors.onPrimary} />
-        <Text style={[typography.labelSmall, { color: colors.onPrimary, fontWeight: '700', marginLeft: 4 }]}>
-          {mapPlayers.length} player{mapPlayers.length !== 1 ? 's' : ''} on map
-        </Text>
-      </View>
-
-      {!loading && mapPlayers.length === 0 && (
-        <View style={styles.mapEmptyBanner}>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
-            {searchMode === 'zip' && !activeZip
-              ? 'Enter a zip code above to find players.'
-              : 'No players to show on the map yet.'}
-          </Text>
-        </View>
-      )}
     </View>
   );
 
@@ -626,28 +505,24 @@ export default function SearchScreen({ navigation }: any) {
 
       {TopControls}
 
-      {viewMode === 'map' ? (
-        MapPane
-      ) : (
-        <FlatList
-          style={{ flex: 1 }}
-          data={players}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <PlayerProfileCard
-              player={item}
-              onConnect={() => handleConnect(item)}
-              onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
-            />
-          )}
-          ListFooterComponent={ListFooter}
-          ListEmptyComponent={ListEmpty}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.4}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.flatListContent}
-        />
-      )}
+      <FlatList
+        style={{ flex: 1 }}
+        data={players}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <PlayerProfileCard
+            player={item}
+            onConnect={() => handleConnect(item)}
+            onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
+          />
+        )}
+        ListFooterComponent={ListFooter}
+        ListEmptyComponent={ListEmpty}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.4}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.flatListContent}
+      />
 
       {/* ── Filter Bottom Sheet ── */}
       <FilterBottomSheet
@@ -698,20 +573,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewToggleRow: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  viewToggleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
@@ -731,45 +592,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
-  },
-  // ── Map ──────────────────────────────────────────────────────────────
-  mapPane: {
-    flex: 1,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-  },
-  mapEmptyBanner: {
-    position: 'absolute',
-    top: spacing.xl,
-    left: spacing.xl,
-    right: spacing.xl,
-    padding: spacing.lg,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  countPill: {
-    position: 'absolute',
-    bottom: spacing.md,
-    alignSelf: 'center',
-    left: '50%',
-    transform: [{ translateX: -72 }],
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 6,
-    borderRadius: borderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
   },
   footerLoader: {
     alignItems: 'center',

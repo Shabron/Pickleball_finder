@@ -24,7 +24,7 @@ import { CornerUpLeft, Send } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
-import { postApi, getToken } from '../../services/api';
+import { postApi, getToken, getAvatarUrl } from '../../services/api';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 
@@ -94,7 +94,7 @@ export default function PostRepliesScreen({ navigation, route }: any) {
 
   const renderReply = ({ item }: { item: any }) => (
     <View style={[styles.replyRow, { borderBottomColor: colors.outlineVariant }]}>
-      <Avatar name={item.author?.name || '?'} size={38} />
+      <Avatar name={item.author?.name || '?'} uri={getAvatarUrl(item.author?.avatar)} size={38} />
       <View style={styles.replyBody}>
         <View style={styles.replyMeta}>
           <Text style={[typography.labelMedium, { color: colors.onSurface }]}>
