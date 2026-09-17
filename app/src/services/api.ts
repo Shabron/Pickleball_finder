@@ -348,7 +348,11 @@ export const profileApi = {
       const response = await fetch(`${API_BASE_URL}/profile/me/avatar`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'multipart/form-data',
+          // No Content-Type here — fetch must generate it itself from the
+          // FormData body, including the multipart boundary. Hardcoding
+          // 'multipart/form-data' without a boundary produces a body the
+          // server's multer parser can't split into parts, so req.file is
+          // never populated and the upload fails.
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: formData,

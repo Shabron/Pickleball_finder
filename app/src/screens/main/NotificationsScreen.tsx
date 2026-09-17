@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Heart, MessageSquare, Users, FileText } from 'lucide-react-native';
+import { Heart, MessageSquare, Users, FileText, CheckCheck } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import { useTheme } from '../../theme/ThemeContext';
@@ -53,6 +53,22 @@ export default function NotificationsScreen({ navigation }: any) {
       console.error('Failed to fetch notifications', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [markingAll, setMarkingAll] = React.useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleMarkAllAsRead = async () => {
+    if (markingAll || unreadCount === 0) return;
+    setMarkingAll(true);
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      console.error('Failed to mark all as read', error);
+    } finally {
+      setMarkingAll(false);
     }
   };
 
@@ -145,6 +161,25 @@ export default function NotificationsScreen({ navigation }: any) {
     <ScreenWrapper>
       <Header title="Notifications" showBack onBack={() => navigation.goBack()} />
 
+      {unreadCount > 0 && (
+        <View style={styles.markAllRow}>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+            {unreadCount} unread
+          </Text>
+          <TouchableOpacity
+            onPress={handleMarkAllAsRead}
+            disabled={markingAll}
+            activeOpacity={0.7}
+            style={styles.markAllBtn}
+          >
+            <CheckCheck size={16} color={colors.primary} />
+            <Text style={[typography.labelMedium, { color: colors.primary, fontWeight: '700', marginLeft: 4 }]}>
+              Mark all as read
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -167,6 +202,17 @@ export default function NotificationsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  markAllRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  markAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.massive,

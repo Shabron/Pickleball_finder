@@ -4,10 +4,18 @@ const { protect } = require('../middleware/auth');
 const { getMyProfile, updateMyProfile, getProfileByUserId, deleteMyProfile, uploadAvatar, reverseGeocode } = require('../controllers/profileController');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Git doesn't track empty directories, so uploads/ never actually exists in
+// a fresh deploy (it's just not in the repo) — multer's diskStorage throws
+// ENOENT trying to write into a directory that isn't there. Create it once
+// at startup so this works regardless of what's checked out.
+const UPLOADS_DIR = path.join(__dirname, '../../uploads/');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination(req, file, cb) {
-    cb(null, path.join(__dirname, '../../uploads/'));
+    cb(null, UPLOADS_DIR);
   },
   filename(req, file, cb) {
     cb(null, `${req.user._id}-${Date.now()}${path.extname(file.originalname)}`);

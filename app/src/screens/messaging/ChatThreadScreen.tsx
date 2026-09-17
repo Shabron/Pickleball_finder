@@ -198,6 +198,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
           renderItem={renderMessage}
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
         {/* ─── Input Bar ─── */}
