@@ -68,7 +68,7 @@ const SKILL_KEY: Record<string, string> = {
 };
 
 type Row =
-  | { kind: 'header'; key: string; title: string; count?: number }
+  | { kind: 'header'; key: string; title: string }
   | { kind: 'notice'; key: string; text: string }
   | { kind: 'player'; key: string; player: PlayerProfileData };
 
@@ -145,6 +145,7 @@ export default function SearchScreen({ navigation }: any) {
   const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
   const [fallback, setFallback] = useState<PlayerProfileData[]>([]);
   const [fallbackLoaded, setFallbackLoaded] = useState(false);
+  const [fallbackError, setFallbackError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -189,21 +190,36 @@ export default function SearchScreen({ navigation }: any) {
     }, [loadProfile])
   );
 
+  // Retry the nationwide list on focus if it failed earlier (e.g. server waking up)
+  const fallbackEmptyRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (fallbackEmptyRef.current) loadFallback();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
+
   // ── Nationwide fallback (fetched once, reused everywhere) ───────────────
   const loadFallback = useCallback(async () => {
     try {
       const res = await matchmakingApi.getNearbyPlayers({ mode: 'state', state: 'ALL', limit: PAGE, offset: 0 });
-      if (res.success && res.data) setFallback(res.data.map(mapPlayer));
+      if (res.success && res.data) {
+        setFallback(res.data.map(mapPlayer));
+        setFallbackError(false);
+      } else {
+        setFallbackError(true);
+      }
     } catch (e) {
       console.warn('SearchScreen: fallback load failed', e);
+      setFallbackError(true);
     } finally {
       setFallbackLoaded(true);
     }
   }, []);
 
   useEffect(() => {
-    loadFallback();
-  }, [loadFallback]);
+    fallbackEmptyRef.current = fallback.length === 0;
+  }, [fallback]);
 
   // ── Primary search ──────────────────────────────────────────────────────
   const canSearch =
@@ -352,19 +368,19 @@ export default function SearchScreen({ navigation }: any) {
         const further = primary.filter(p => (p.distanceMi ?? Infinity) > radiusMi); // already nearest-first
         const where = searchMode === 'zip' ? ` of ${activeZip}` : '';
         if (within.length) {
-          out.push({ kind: 'header', key: 'h-within', title: `Within ${radiusMi} mi${where}`, count: within.length });
+          out.push({ kind: 'header', key: 'h-within', title: `Within ${radiusMi} mi${where}` });
           push(within);
         } else {
           out.push({ kind: 'notice', key: 'n-none', text: `No players within ${radiusMi} mi yet — here are the closest ones.` });
         }
         if (further.length) {
-          out.push({ kind: 'header', key: 'h-further', title: within.length ? 'Further away' : 'Closest players', count: further.length });
+          out.push({ kind: 'header', key: 'h-further', title: within.length ? 'Further away' : 'Closest players' });
           push(further);
         }
       } else {
         const title =
           searchMode === 'zip' ? `Near ${activeZip}` : selectedState === 'ALL' ? 'Players across the US' : `Players in ${stateLabel}`;
-        out.push({ kind: 'header', key: 'h-primary', title, count: primary.length });
+        out.push({ kind: 'header', key: 'h-primary', title });
         push(sortList(primary));
       }
       return { rows: out, playerCount: primary.length, emptyKind: null as null | string };
@@ -389,16 +405,17 @@ export default function SearchScreen({ navigation }: any) {
             : 'No players near you yet.';
         out.push({ kind: 'notice', key: 'n-fb', text: `${why} Here are players across the US you can connect with.` });
       }
-      out.push({ kind: 'header', key: 'h-fb', title: 'Players across the US', count: extras.length });
+      out.push({ kind: 'header', key: 'h-fb', title: 'Players across the US' });
       push(extras);
       return { rows: out, playerCount: extras.length, emptyKind: null };
     }
 
     if (!fallbackLoaded) return { rows: out, playerCount: 0, emptyKind: null };
     if (fallback.length > 0 && fb.length === 0) return { rows: out, playerCount: 0, emptyKind: 'filtered' };
-    return { rows: out, playerCount: 0, emptyKind: 'invite' };
+    // Only claim "no players" when the server actually said so
+    return { rows: out, playerCount: 0, emptyKind: fallbackError ? 'error' : 'invite' };
   }, [
-    allPlayers, fallback, fallbackLoaded, applyFilters, sortList, canSearch, searched,
+    allPlayers, fallback, fallbackLoaded, fallbackError, applyFilters, sortList, canSearch, searched,
     searchMode, radiusMi, activeZip, selectedState, stateLabel,
   ]);
 
@@ -629,9 +646,6 @@ export default function SearchScreen({ navigation }: any) {
       return (
         <View style={styles.sectionHeader}>
           <Text style={[typography.labelLarge, { color: colors.onSurface, fontWeight: '700' }]}>{item.title}</Text>
-          {item.count != null && (
-            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: 6 }]}>{item.count}</Text>
-          )}
         </View>
       );
     }
@@ -665,6 +679,19 @@ export default function SearchScreen({ navigation }: any) {
       <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.md }]}>No players match these filters</Text>
       <TouchableOpacity onPress={() => setFilters(DEFAULT_FILTERS)} style={[styles.emptyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
         <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>Clear filters</Text>
+      </TouchableOpacity>
+    </View>
+  ) : emptyKind === 'error' ? (
+    <View style={styles.empty}>
+      <Users size={40} color={colors.onSurfaceVariant} />
+      <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.md, textAlign: 'center' }]}>
+        Couldn't load players
+      </Text>
+      <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: spacing.xs, textAlign: 'center' }]}>
+        The server may be waking up. This can take up to a minute.
+      </Text>
+      <TouchableOpacity onPress={onRefresh} style={[styles.emptyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
+        <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>Try again</Text>
       </TouchableOpacity>
     </View>
   ) : (

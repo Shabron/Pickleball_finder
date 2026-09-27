@@ -11,7 +11,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, ViewStyl
 import { MapPin, CircleCheck, Star, Sparkles } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius } from '../theme/spacing';
-import { getSkillLevelLabel } from '../constants/skillLevels';
+import { getSkillLevelLabel, PLAY_STYLE_LABELS } from '../constants/skillLevels';
+import { matchReason } from '../utils/playerHelpers';
 import Avatar from './common/Avatar';
 
 export interface PlayerProfileData {
@@ -45,29 +46,7 @@ interface Props {
   style?: ViewStyle;
 }
 
-const SKILL_ORDER: Record<string, number> = {
-  beginner: 0, lowIntermediate: 1, highIntermediate: 2, advanced: 3, professional: 4,
-};
-const STYLE_LABELS: Record<string, string> = {
-  singles: 'Singles', doubles: 'Doubles', mixed: 'Mixed', any: 'Any style',
-};
-
-/** One short, honest reason — or null when nothing stands out. */
-function matchReason(player: PlayerProfileData, me?: Props['me']): string | null {
-  const a = SKILL_ORDER[me?.skillLevel ?? ''];
-  const b = SKILL_ORDER[player.level];
-  if (a != null && b != null) {
-    if (a === b) return 'Same level as you';
-    if (Math.abs(a - b) === 1) return 'Close to your level';
-  }
-  const mine = me?.playStyle;
-  const theirs = player.playStyle?.toLowerCase();
-  if (mine && theirs && mine !== 'any' && mine === theirs) {
-    return `Also plays ${STYLE_LABELS[theirs]?.toLowerCase() ?? theirs}`;
-  }
-  if (player.distanceMi != null && player.distanceMi <= 3) return 'Lives close by';
-  return null;
-}
+const STYLE_LABELS = PLAY_STYLE_LABELS;
 
 export default function PlayerProfileCard({ player, me, onConnect, onViewProfile, style }: Props) {
   const { colors, typography } = useTheme();
@@ -132,9 +111,11 @@ export default function PlayerProfileCard({ player, me, onConnect, onViewProfile
               </Text>
             </View>
             {playStyleLabel && (
-              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: 6 }]} numberOfLines={1}>
-                {playStyleLabel}
-              </Text>
+              <View style={[styles.chip, { backgroundColor: colors.surfaceContainer, marginLeft: 6 }]}>
+                <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                  {playStyleLabel}
+                </Text>
+              </View>
             )}
           </View>
 

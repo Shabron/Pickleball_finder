@@ -177,6 +177,7 @@ const getProfileByUserId = async (req, res) => {
     let connectionStatus = 'none';
     let conversationId = null;
     let matchScore = null;
+    let distanceKm = null;
 
     if (req.user && req.user._id) {
       const conv = await Conversation.findOne({
@@ -195,13 +196,15 @@ const getProfileByUserId = async (req, res) => {
       }
 
       const myProfile = await Profile.findOne({ user: req.user._id }, 'skillLevel playStyle location');
-      const distanceKm = Math.round(
-        (haversineKm(myProfile?.location?.coordinates, profile.location?.coordinates) ?? NaN) * 10
-      ) / 10;
-      matchScore = computeMatchScore(myProfile, profile, Number.isNaN(distanceKm) ? null : distanceKm);
+      const km = haversineKm(myProfile?.location?.coordinates, profile.location?.coordinates);
+      distanceKm = typeof km === 'number' && !Number.isNaN(km) ? Math.round(km * 10) / 10 : null;
+      matchScore = computeMatchScore(myProfile, profile, distanceKm);
     }
 
-    res.status(200).json({ success: true, data: { ...profile.toObject(), connectionStatus, conversationId, matchScore } });
+    res.status(200).json({
+      success: true,
+      data: { ...profile.toObject(), connectionStatus, conversationId, matchScore, distanceKm },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

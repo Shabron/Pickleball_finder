@@ -1,357 +1,331 @@
 /**
- * UserProfileScreen — View another player's full profile
+ * UserProfileScreen — v2 (another player's profile)
  *
- * Shown when tapping "View Profile" from the Matchmaking feed.
- * Displays the player's photo, stats, bio, play style, and
- * a prominent "👋 Connect" CTA.
+ *  - Compact header card: avatar, name, level/style tags, real distance,
+ *    plain-language match reason (no fake %)
+ *  - Real content instead of fake stats: About, "Usually plays" schedule,
+ *    and this player's open posts (tap → Post Detail)
+ *  - Fixed bottom Connect / Message bar (shared logic with Post Detail)
  */
-import React, { useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
+  ActivityIndicator,
   Animated,
-  Dimensions,
 } from 'react-native';
-import {
-  MapPin,
-  CircleCheck,
-  Zap,
-  Trophy,
-  Users,
-  Calendar,
-  ChevronLeft,
-  MoreVertical,
-  Star,
-} from 'lucide-react-native';
+import { MapPin, CircleCheck, Calendar, MoreVertical, Star, Sparkles, Clock, ChevronRight } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
-import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
 import ReportBlockSheet from '../../components/ReportBlockSheet';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { getSkillLevelLabel } from '../../constants/skillLevels';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const AVATAR_SIZE = SCREEN_WIDTH * 0.38;
-
-import { profileApi, messageApi } from '../../services/api';
-import { API_BASE_URL } from '@env';
-
-// ─── Component ────────────────────────────────────────────────────────────────
+import { spacing, borderRadius } from '../../theme/spacing';
+import { getSkillLevelLabel, getPlayStyleLabel } from '../../constants/skillLevels';
+import { profileApi, postApi, getAvatarUrl } from '../../services/api';
+import { formatMiles, matchReason, summarizeAvailability, timeAgo } from '../../utils/playerHelpers';
+import { ConnectionStatus, connectLabel, runConnect } from '../../utils/connect';
 
 export default function UserProfileScreen({ navigation, route }: any) {
   const { colors, typography } = useTheme();
-  const userId = route?.params?.userId;
-  
-  const [player, setPlayer] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [showActionSheet, setShowActionSheet] = React.useState(false);
+  const userId: string | undefined = route?.params?.userId;
 
-  React.useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        if (!userId) return;
-        const res = await profileApi.getProfileByUserId(userId);
-        if (res.success && res.data) {
-          const p = res.data;
-          setPlayer({
-            id: p.user?._id || userId,
-            name: p.user?.name || 'Unknown',
-            fullName: p.user?.name || 'Unknown',
-            age: p.ageRange || 'N/A',
-            level: p.skillLevel || 'N/A',
-            distance: 'Nearby', // Mocked for now
-            matchScore: p.matchScore,
-            playStyle: Array.isArray(p.playStyle) ? p.playStyle : (p.playStyle ? [p.playStyle] : []),
-            bio: p.bio || 'No bio provided.',
-            location: `${p.city ? p.city + ', ' : ''}${p.state || ''}`,
-            memberSince: new Date(p.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-            avatarUri: p.avatar ? `${API_BASE_URL.replace('/api', '')}${p.avatar}` : undefined,
-            stats: { matches: 0, wins: 0, partners: 0 },
-            connectionStatus: p.connectionStatus || 'none',
-            conversationId: p.conversationId,
-            avgRating: p.avgRating,
-            ratingCount: p.ratingCount,
-            emailVerified: p.user?.emailVerified,
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load user profile:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
+  const [p, setP] = useState<any>(null);
+  const [me, setMe] = useState<{ skillLevel?: string; playStyle?: string } | null>(null);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState<ConnectionStatus>('none');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
+  const pulse = useRef(new Animated.Value(0.5)).current;
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const [profRes, meRes, postsRes] = await Promise.all([
+        profileApi.getProfileByUserId(userId),
+        profileApi.getProfile().catch(() => null),
+        postApi.getPosts({ author: userId, status: 'Open', limit: '5' }).catch(() => null),
+      ]);
+      if (!profRes?.success || !profRes.data) throw new Error('not found');
+      setP(profRes.data);
+      setStatus(profRes.data.connectionStatus || 'none');
+      setConversationId(profRes.data.conversationId || null);
+      if (meRes?.data) setMe({ skillLevel: meRes.data.skillLevel, playStyle: meRes.data.playStyle });
+      setPosts(postsRes?.data?.posts || []);
+    } catch (e) {
+      console.warn('UserProfile: load failed', e);
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const barAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
-    if (!player) return;
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.timing(barAnim, {
-        toValue: (player.matchScore ?? 0) / 100,
-        duration: 900,
-        delay: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [player, fadeAnim, barAnim]);
+    if (!loading) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.5, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [loading, pulse]);
+
+  const name: string = p?.user?.name?.trim() || 'Player';
+  const firstName = name.split(/\s+/)[0];
 
   const handleConnect = async () => {
-    try {
-      if (player.connectionStatus === 'accepted') {
-        navigation.navigate('ChatThread', {
-          conversationId: player.conversationId,
-          userId: player.id,
-          name: player.fullName,
-        });
-        return;
-      }
-
-      if (player.connectionStatus === 'pending_received' && player.conversationId) {
-        const res = await messageApi.acceptRequest(player.conversationId);
-        if (res.success) {
-          setPlayer(prev => ({ ...prev, connectionStatus: 'accepted' }));
-          navigation.navigate('ChatThread', {
-            conversationId: player.conversationId,
-            userId: player.id,
-            name: player.fullName,
-          });
-        }
-        return;
-      }
-
-      if (player.connectionStatus === 'pending_sent') {
-        return; // Already sent, do nothing
-      }
-
-      // Default: Send an automated intro message
-      const res = await messageApi.sendMessage(
-        player.id,
-        "Hi! I saw you on Senior Pickleball Partners. Let's play!"
-      );
-      if (res.success) {
-        setPlayer(prev => ({ ...prev, connectionStatus: 'pending_sent', conversationId: res.conversationId }));
-      } else {
-        alert('Failed to send message: ' + res.message);
-      }
-    } catch (error: any) {
-      console.error('Failed to connect:', error);
-      alert('Failed to connect: ' + error.message);
-    }
+    if (!userId || connecting) return;
+    setConnecting(true);
+    await runConnect({ userId, name, status, conversationId }, navigation, patch => {
+      setStatus(patch.status);
+      if (patch.conversationId !== undefined) setConversationId(patch.conversationId);
+    });
+    setConnecting(false);
   };
 
-  if (loading || !player) {
+  // ── Loading skeleton ─────────────────────────────────────────────────────
+  if (loading) {
+    const bar = (w: string, h: number, mt = 0) => (
+      <View style={{ width: w as any, height: h, marginTop: mt, borderRadius: 6, backgroundColor: colors.surfaceContainer }} />
+    );
     return (
       <ScreenWrapper>
-        <Header showLogo title="Senior Pickleball Partners" showBack onBack={() => navigation.goBack()} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Loading profile...</Text>
+        <Header title="" showBack onBack={() => navigation.goBack()} />
+        <Animated.View style={{ opacity: pulse, paddingHorizontal: spacing.lg }}>
+          <View style={[styles.card, styles.heroRow, { backgroundColor: colors.surface }]}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surfaceContainer }} />
+            <View style={{ flex: 1, marginLeft: spacing.lg }}>
+              {bar('60%', 18)}
+              {bar('45%', 12, 10)}
+              {bar('70%', 12, 8)}
+            </View>
+          </View>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            {bar('25%', 12)}
+            {bar('90%', 12, 12)}
+            {bar('70%', 12, 8)}
+          </View>
+        </Animated.View>
+      </ScreenWrapper>
+    );
+  }
+
+  if (failed || !p) {
+    return (
+      <ScreenWrapper>
+        <Header title="" showBack onBack={() => navigation.goBack()} />
+        <View style={styles.center}>
+          <Text style={[typography.titleSmall, { color: colors.onSurface, textAlign: 'center' }]}>Couldn't load this profile</Text>
+          <TouchableOpacity onPress={load} style={[styles.pillBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
+            <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>Try again</Text>
+          </TouchableOpacity>
         </View>
       </ScreenWrapper>
     );
   }
 
-  const scoreColor =
-    (player.matchScore ?? 0) >= 85
-      ? colors.success
-      : (player.matchScore ?? 0) >= 70
-      ? colors.secondary
-      : colors.tertiary;
+  const distance = formatMiles(p.distanceKm);
+  const place = [p.city, p.state].filter(Boolean).join(', ');
+  const styleLabel = getPlayStyleLabel(p.playStyle);
+  const reason = matchReason(
+    { level: p.skillLevel, playStyle: p.playStyle, distanceMi: p.distanceKm != null ? p.distanceKm / 1.609344 : undefined },
+    me
+  );
+  const schedule = summarizeAvailability(p.availability);
+  const memberSince = p.createdAt
+    ? new Date(p.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : null;
+
+  const skillTone: Record<string, { bg: string; fg: string }> = {
+    beginner: { bg: colors.brandGreenContainer, fg: colors.onBrandGreenContainer },
+    lowIntermediate: { bg: colors.secondaryContainer, fg: colors.onSecondaryContainer },
+    highIntermediate: { bg: colors.primaryContainer, fg: colors.onPrimaryContainer },
+    advanced: { bg: colors.tertiaryContainer, fg: colors.onTertiaryContainer },
+    professional: { bg: colors.errorContainer, fg: colors.onErrorContainer },
+  };
+  const tone = skillTone[p.skillLevel] || { bg: colors.surfaceContainer, fg: colors.onSurfaceVariant };
 
   return (
     <ScreenWrapper>
       <Header
-        showLogo
-        title="Senior Pickleball Partners"
+        title=""
         showBack
         onBack={() => navigation.goBack()}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => setShowSheet(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[styles.moreBtn, { backgroundColor: colors.surface }]}
+            activeOpacity={0.75}
+          >
+            <MoreVertical size={18} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        }
       />
 
-      <Animated.ScrollView
-        style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ─── Hero card ─── */}
-        <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
-          {/* Match score badge + overflow menu */}
-          <View style={styles.topRightStack}>
-            {player.matchScore && (
-              <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
-                <Zap size={13} color={scoreColor} />
-                <Text style={[typography.labelSmall, { color: scoreColor, fontWeight: '700', marginLeft: 3 }]}>
-                  {player.matchScore}% Match
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ── Identity ── */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <View style={styles.heroRow}>
+            <Avatar name={name} uri={getAvatarUrl(p.avatar)} size={80} />
+            <View style={{ flex: 1, marginLeft: spacing.lg }}>
+              <View style={styles.inline}>
+                <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700', flexShrink: 1 }]} numberOfLines={2}>
+                  {name}
                 </Text>
+                {p.user?.emailVerified && <CircleCheck size={18} color={colors.secondary} style={{ marginLeft: 6 }} />}
               </View>
-            )}
-            <TouchableOpacity
-              style={[styles.overflowBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-              activeOpacity={0.75}
-              onPress={() => setShowActionSheet(true)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MoreVertical size={18} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Avatar with double ring */}
-          <View style={styles.avatarSection}>
-            <View style={[styles.avatarOuterRing, { borderColor: colors.primary + '40' }]}>
-              <View style={[styles.avatarInnerRing, { borderColor: colors.tertiary + '60' }]}>
-                <Avatar name={player.fullName} uri={player.avatarUri} size={AVATAR_SIZE} />
+              {!!p.ageRange && (
+                <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 2 }]}>Age {p.ageRange}</Text>
+              )}
+              <View style={[styles.inline, { marginTop: spacing.sm, flexWrap: 'wrap', gap: 6 }]}>
+                {!!p.skillLevel && (
+                  <View style={[styles.tag, { backgroundColor: tone.bg }]}>
+                    <Text style={[typography.labelMedium, { color: tone.fg }]}>{getSkillLevelLabel(p.skillLevel)}</Text>
+                  </View>
+                )}
+                {!!styleLabel && (
+                  <View style={[styles.tag, { backgroundColor: colors.surfaceContainer }]}>
+                    <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>{styleLabel}</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
 
-          {/* Name + age + verified */}
-          <View style={styles.nameRow}>
-            <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '800' }]}>
-              {player.fullName}
-            </Text>
-            {player.age && player.age !== 'N/A' && (
-              <Text style={[typography.headlineSmall, { color: colors.onSurfaceVariant, fontWeight: '400', marginLeft: 6 }]}>
-                {player.age}
-              </Text>
-            )}
-            {player.emailVerified && (
-              <CircleCheck size={20} color={colors.secondary} style={{ marginLeft: 6 }} />
-            )}
-          </View>
-
-          {/* Rating */}
-          {!!player.ratingCount && (
-            <View style={styles.ratingRow}>
-              <Star size={15} color={colors.tertiary} fill={colors.tertiary} />
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: 5, fontWeight: '600' }]}>
-                {player.avgRating?.toFixed(1)} ({player.ratingCount} rating{player.ratingCount === 1 ? '' : 's'})
-              </Text>
+          {(distance || place || reason || !!p.ratingCount) && (
+            <View style={[styles.metaBlock, { borderTopColor: colors.outlineVariant }]}>
+              {(distance || place) && (
+                <View style={styles.inline}>
+                  <MapPin size={15} color={colors.onSurfaceVariant} />
+                  <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: 6, flexShrink: 1 }]} numberOfLines={1}>
+                    {distance ? <Text style={{ color: colors.primary, fontWeight: '600' }}>{distance} away</Text> : null}
+                    {distance && place ? ' · ' : ''}
+                    {place}
+                  </Text>
+                </View>
+              )}
+              {!!p.ratingCount && (
+                <View style={[styles.inline, { marginTop: 6 }]}>
+                  <Star size={15} color={colors.tertiary} fill={colors.tertiary} />
+                  <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: 6 }]}>
+                    {p.avgRating?.toFixed(1)} · {p.ratingCount} rating{p.ratingCount === 1 ? '' : 's'}
+                  </Text>
+                </View>
+              )}
+              {reason && (
+                <View style={[styles.inline, { marginTop: 6 }]}>
+                  <Sparkles size={15} color={colors.brandGreen} />
+                  <Text style={[typography.bodyMedium, { color: colors.brandGreen, marginLeft: 6, fontWeight: '600' }]}>{reason}</Text>
+                </View>
+              )}
             </View>
           )}
+        </View>
 
-          {/* Skill level */}
-          <View style={[styles.levelChip, { backgroundColor: colors.primaryContainer }]}>
-            <Text style={[typography.labelMedium, { color: colors.onPrimaryContainer, fontWeight: '700' }]}>
-              🏓 Level {getSkillLevelLabel(player.level)}
-            </Text>
+        {/* ── About ── */}
+        {!!p.bio && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurface, fontWeight: '700', marginBottom: 6 }]}>About</Text>
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, lineHeight: 22 }]}>{p.bio}</Text>
           </View>
+        )}
 
-          {/* Compatibility bar */}
-          {player.matchScore && (
-            <View style={styles.barSection}>
-              <View style={styles.barLabelRow}>
-                <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>Compatibility</Text>
-                <Text style={[typography.labelSmall, { color: scoreColor, fontWeight: '700' }]}>
-                  {player.matchScore}%
-                </Text>
-              </View>
-              <View style={[styles.barTrack, { backgroundColor: colors.surfaceContainerHigh }]}>
-                <Animated.View
-                  style={[
-                    styles.barFill,
-                    {
-                      backgroundColor: scoreColor,
-                      width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-          )}
-
-          {/* Distance + location */}
-          <View style={styles.locationRow}>
-            <MapPin size={15} color={colors.onSurfaceVariant} />
-            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginLeft: 5 }]}>
-              {player.distance} · {player.location}
-            </Text>
-          </View>
-
-          {/* Play style chips */}
-          <View style={styles.chipsRow}>
-            {player.playStyle.map((style: string) => (
-              <View key={style} style={[styles.chip, { backgroundColor: colors.secondaryContainer }]}>
-                <Text style={[typography.labelSmall, { color: colors.onSecondaryContainer, fontWeight: '600' }]}>
-                  {style}
-                </Text>
+        {/* ── Schedule ── */}
+        {schedule.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurface, fontWeight: '700', marginBottom: spacing.sm }]}>Usually plays</Text>
+            {schedule.map(s => (
+              <View key={s.days} style={[styles.inline, { marginTop: 4 }]}>
+                <Clock size={14} color={colors.primary} />
+                <Text style={[typography.bodyMedium, { color: colors.onSurface, marginLeft: 8, fontWeight: '600' }]}>{s.days}</Text>
+                <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}> · {s.hours}</Text>
               </View>
             ))}
           </View>
-        </View>
+        )}
 
-        {/* ─── Stats ─── */}
-        <View style={styles.statsRow}>
-          {[
-            { label: 'Matches', value: player.stats.matches, icon: <Trophy size={18} color={colors.tertiary} />, color: colors.tertiary },
-            { label: 'Wins', value: player.stats.wins, icon: <Zap size={18} color={colors.success} />, color: colors.success },
-            { label: 'Partners', value: player.stats.partners, icon: <Users size={18} color={colors.secondary} />, color: colors.secondary },
-          ].map(stat => (
-            <View key={stat.label} style={[styles.statCard, { backgroundColor: colors.surface }]}>
-              {stat.icon}
-              <Text style={[typography.headlineMedium, { color: stat.color, fontWeight: '800', marginTop: 4 }]}>
-                {stat.value}
-              </Text>
-              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
+        {/* ── Open posts ── */}
+        {posts.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface, paddingBottom: spacing.sm }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurface, fontWeight: '700', marginBottom: 4 }]}>{firstName}'s open posts</Text>
+            {posts.map((post, i) => (
+              <Pressable
+                key={post._id}
+                onPress={() => navigation.push('PostDetail', { postId: post._id })}
+                style={({ pressed }) => [
+                  styles.postRow,
+                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600' }]} numberOfLines={1}>
+                    {post.title}
+                  </Text>
+                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 2 }]} numberOfLines={1}>
+                    {[getPlayStyleLabel(post.playStyle), timeAgo(post.createdAt)].filter(Boolean).join(' · ')}
+                    {post.replyCount ? ` · ${post.replyCount} repl${post.replyCount === 1 ? 'y' : 'ies'}` : ''}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            ))}
+          </View>
+        )}
 
-        {/* ─── About ─── */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '700', marginBottom: spacing.sm }]}>
-            About
-          </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, lineHeight: 24 }]}>
-            {player.bio}
-          </Text>
-        </View>
+        {memberSince && (
+          <View style={[styles.inline, { justifyContent: 'center', marginTop: spacing.xs }]}>
+            <Calendar size={13} color={colors.onSurfaceVariant} />
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: 6 }]}>Member since {memberSince}</Text>
+          </View>
+        )}
+      </ScrollView>
 
-        {/* ─── Member since ─── */}
-        <View style={[styles.memberRow, { backgroundColor: colors.surfaceDim }]}>
-          <Calendar size={16} color={colors.onSurfaceVariant} />
-          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: 8 }]}>
-            Member since {player.memberSince}
-          </Text>
-        </View>
-
-        {/* ─── Actions ─── */}
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[
-              styles.btnConnect,
-              { backgroundColor: player.connectionStatus === 'pending_sent' ? colors.surfaceContainerHighest : colors.primary }
-            ]}
-            activeOpacity={0.8}
-            onPress={handleConnect}
-            disabled={player.connectionStatus === 'pending_sent'}
-          >
-            <Text style={[
-              typography.labelLarge,
-              { color: player.connectionStatus === 'pending_sent' ? colors.onSurfaceVariant : colors.onPrimary, fontWeight: '700' }
-            ]}>
-              {player.connectionStatus === 'accepted' ? '💬 Message' :
-               player.connectionStatus === 'pending_sent' ? '⏳ Requested' :
-               player.connectionStatus === 'pending_received' ? '✅ Accept Request' :
-               '👋 Connect'}
+      {/* ── Fixed Connect / Message bar ── */}
+      <View style={[styles.bottomBar, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity
+          onPress={handleConnect}
+          disabled={status === 'pending_sent' || connecting}
+          activeOpacity={0.85}
+          style={[styles.cta, { backgroundColor: status === 'pending_sent' ? colors.surfaceContainer : colors.primary }]}
+        >
+          {connecting ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <Text
+              style={[
+                typography.labelLarge,
+                { color: status === 'pending_sent' ? colors.onSurfaceVariant : colors.onPrimary, fontWeight: '700', fontSize: 16 },
+              ]}
+            >
+              {status === 'none' ? `Connect with ${firstName}` : connectLabel(status)}
             </Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.ScrollView>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <ReportBlockSheet
-        visible={showActionSheet}
-        userId={player.id}
-        userName={player.fullName}
+        visible={showSheet}
+        userId={userId as string}
+        userName={name}
         context="profile"
-        onClose={() => setShowActionSheet(false)}
+        onClose={() => setShowSheet(false)}
         onBlocked={() => navigation.goBack()}
       />
     </ScreenWrapper>
@@ -359,157 +333,78 @@ export default function UserProfileScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: spacing.lg,
-    paddingBottom: 100,
-    gap: spacing.lg,
-  },
-  heroCard: {
-    borderRadius: borderRadius.xxl,
-    padding: spacing.xl,
-    paddingTop: spacing.xxl,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
-    position: 'relative',
-  },
-  topRightStack: {
-    position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-  },
-  scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-  },
-  overflowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarSection: {
-    marginBottom: spacing.xl,
-    marginTop: spacing.md,
-  },
-  avatarOuterRing: {
-    borderWidth: 3,
-    borderRadius: 9999,
-    padding: 5,
-  },
-  avatarInnerRing: {
-    borderWidth: 2,
-    borderRadius: 9999,
-    padding: 3,
-  },
-  avatar: {
-    resizeMode: 'cover',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  levelChip: {
+  scroll: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: borderRadius.full,
-    marginBottom: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xl,
   },
-  barSection: {
-    width: '100%',
-    marginBottom: spacing.md,
-  },
-  barLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  barTrack: {
-    width: '100%',
-    height: 8,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    justifyContent: 'center',
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  section: {
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
+  card: {
     borderRadius: borderRadius.lg,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  btnConnect: {
-    flex: 1,
-    height: 52,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1D628B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 2,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  metaBlock: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  postRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  moreBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  cta: {
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  pillBtn: {
+    marginTop: spacing.lg,
+    height: 44,
+    paddingHorizontal: spacing.xl,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
