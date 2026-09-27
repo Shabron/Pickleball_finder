@@ -33,7 +33,7 @@ type Status = 'idle' | 'loading' | 'success' | 'error';
 
 export default function LocationAutofillButton({
   onLocated,
-  label = '📍 Use My Current Location',
+  label = 'Use my current location',
   style,
 }: LocationAutofillButtonProps) {
   const { colors, typography } = useTheme();

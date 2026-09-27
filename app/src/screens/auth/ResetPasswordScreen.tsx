@@ -1,29 +1,25 @@
 /**
- * ResetPasswordScreen — Step 2 of the forgot-password flow
+ * ResetPasswordScreen — v2
  *
- * User enters the 6-digit code emailed to them plus a new password.
- * On success the backend returns a fresh auth token, so we log the
- * user straight in (same pattern as Login/Signup).
+ * Step 2 of the reset flow: 6-digit code (digit boxes) + new password.
+ * On success the backend returns a token, so the user is logged straight in.
+ * Resend has a 30-second cool-down; errors are inline.
  */
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { Check, Circle } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
+import AuthHeader from '../../components/common/AuthHeader';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import CodeInput from '../../components/common/CodeInput';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing } from '../../theme/spacing';
+import { spacing, borderRadius } from '../../theme/spacing';
 import { authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+
+const MIN_PASSWORD = 6;
+const COOLDOWN = 30;
 
 export default function ResetPasswordScreen({ navigation, route }: any) {
   const email: string = route?.params?.email || '';
@@ -31,23 +27,33 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(COOLDOWN); // a code was just sent
   const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const { colors, typography } = useTheme();
   const { login } = useAuth();
 
-  const isValid =
-    code.trim().length === 6 &&
-    password.trim().length >= 6 &&
-    password === confirmPassword;
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const longEnough = password.length >= MIN_PASSWORD;
+  const matches = !!confirmPassword && password === confirmPassword;
+  const isValid = code.length === 6 && longEnough && matches;
+
+  const clearError = () => error && setError('');
 
   const handleReset = async () => {
-    if (!isValid) return;
+    if (!isValid || loading) return;
     setLoading(true);
+    setError('');
     try {
-      const response = await authApi.resetPassword(email, code.trim(), password);
+      const response = await authApi.resetPassword(email, code, password);
       const token = response.data?.token || response.token;
       const userData = response.data;
-
       if (token && userData) {
         await login(token, {
           _id: userData._id,
@@ -56,115 +62,143 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
           profileComplete: userData.profileComplete,
         });
       } else {
-        Alert.alert('Reset Failed', 'Unexpected response from server.');
+        setError('Something went wrong. Please try again.');
       }
-    } catch (error: any) {
-      Alert.alert('Reset Failed', error.message || 'Invalid or expired code.');
+    } catch (e: any) {
+      setError(e?.message || 'That code is wrong or has expired.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (cooldown > 0 || resending) return;
     setResending(true);
+    setError('');
     try {
       await authApi.forgotPassword(email);
-      Alert.alert('Code Sent', 'A new reset code has been sent to your email.');
-    } catch (error: any) {
-      Alert.alert('Something went wrong', error.message || 'Failed to resend code.');
+      setCooldown(COOLDOWN);
+      setCode('');
+      setResent(true);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't send a new code. Please try again.");
     } finally {
       setResending(false);
     }
   };
 
+  const Rule = ({ ok, label }: { ok: boolean; label: string }) => (
+    <View style={styles.ruleRow}>
+      {ok ? (
+        <Check size={16} color={colors.brandGreen} />
+      ) : (
+        <Circle size={14} color={colors.outline} style={{ marginHorizontal: 1 }} />
+      )}
+      <Text
+        style={[typography.bodySmall, { color: ok ? colors.brandGreen : colors.onSurfaceVariant, marginLeft: spacing.xs }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
   return (
     <ScreenWrapper>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
+          <AuthHeader
+            title="Reset password"
+            subtitle={email ? `Enter the 6-digit code we sent to ${email}.` : 'Enter the 6-digit code we emailed you.'}
+            onBack={() => navigation.goBack()}
+          />
 
-          <View style={styles.welcomeSection}>
-            <Text style={[typography.headlineMedium, styles.title]}>
-              Enter Reset Code
-            </Text>
-            <Text style={[typography.bodyLarge, styles.subtitle]}>
-              We sent a 6-digit code to {email}. Enter it below along with your new password.
-            </Text>
-          </View>
-
-          <View style={styles.card}>
-            <Input
-              label="6-Digit Code"
-              placeholder="123456"
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurface, marginBottom: spacing.sm }]}>Code</Text>
+            <CodeInput
               value={code}
-              onChangeText={(t) => setCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
-              keyboardType="number-pad"
-              maxLength={6}
-              containerStyle={{ marginBottom: spacing.lg }}
+              onChange={d => {
+                setCode(d);
+                clearError();
+              }}
+              autoFocus
+              disabled={loading}
             />
+            <View style={styles.resendRow}>
+              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>Didn't get it? </Text>
+              <TouchableOpacity onPress={handleResend} disabled={cooldown > 0 || resending}>
+                <Text
+                  style={[
+                    typography.bodyMedium,
+                    { color: cooldown > 0 || resending ? colors.onSurfaceVariant : colors.primary, fontWeight: '700' },
+                  ]}
+                >
+                  {resending ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Send a new code'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {resent && cooldown > 0 && (
+              <Text style={[typography.bodySmall, { color: colors.brandGreen, marginTop: 4 }]}>
+                New code sent. Check your spam folder too.
+              </Text>
+            )}
 
             <Input
-              label="New Password"
-              placeholder="New Password"
+              label="New password"
+              placeholder="At least 6 characters"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={t => {
+                setPassword(t);
+                clearError();
+              }}
               isPassword
-              containerStyle={{ marginBottom: spacing.lg }}
+              autoComplete="password-new"
+              textContentType="newPassword"
+              containerStyle={{ marginTop: spacing.xl, marginBottom: spacing.lg }}
+            />
+            <Input
+              label="Confirm new password"
+              placeholder="Type it again"
+              value={confirmPassword}
+              onChangeText={t => {
+                setConfirmPassword(t);
+                clearError();
+              }}
+              isPassword
+              autoComplete="password-new"
+              textContentType="newPassword"
+              error={confirmPassword && !matches ? "Passwords don't match" : undefined}
             />
 
-            <Input
-              label="Confirm New Password"
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              isPassword
-              error={
-                confirmPassword && password !== confirmPassword
-                  ? 'Passwords do not match'
-                  : undefined
-              }
-              containerStyle={{ marginBottom: spacing.xl }}
-            />
+            {!!password && (
+              <View style={styles.rules}>
+                <Rule ok={longEnough} label={`At least ${MIN_PASSWORD} characters`} />
+                <Rule ok={matches} label="Both passwords match" />
+              </View>
+            )}
+
+            {!!error && (
+              <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
+                <Text style={[typography.bodyMedium, { color: colors.error }]}>{error}</Text>
+              </View>
+            )}
 
             <Button
-              title="RESET PASSWORD"
+              title="Reset password"
               onPress={handleReset}
               loading={loading}
-              disabled={!isValid}
+              disabled={!isValid || loading}
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+              textStyle={{ color: '#FFFFFF', fontWeight: '700' }}
             />
-
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={handleResend}
-              disabled={resending}
-            >
-              <Text style={[styles.supportText, { color: colors.brandGreen }]}>
-                {resending ? 'Resending...' : "Didn't get a code? Resend"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Back to Log In</Text>
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity style={styles.backLink} onPress={() => navigation.navigate('Login')}>
+            <Text style={[typography.bodyLarge, { color: colors.primary, fontWeight: '700' }]}>Back to log in</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenWrapper>
@@ -172,56 +206,43 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  logo: {
-    width: 160,
-    height: 160,
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-  },
-  title: {
-    color: '#0F2C4C',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#1B1B1B',
-    marginTop: spacing.xs,
-    textAlign: 'center',
+    paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: spacing.xl,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
-    elevation: 4,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  resendRow: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+  },
+  rules: {
+    marginTop: spacing.md,
+    gap: 6,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  errorBox: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.lg,
   },
   actionButton: {
     height: 52,
-    marginTop: spacing.xs,
+    marginTop: spacing.xl,
   },
-  footerLink: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  supportText: {
-    textDecorationLine: 'underline',
-    color: '#111827',
-    fontSize: 15,
+  backLink: {
+    alignSelf: 'center',
+    marginTop: spacing.xl,
   },
 });

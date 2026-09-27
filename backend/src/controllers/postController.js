@@ -276,6 +276,20 @@ const getMyPosts = async (req, res) => {
       .lean();
     await attachAuthorAvatars(posts);
 
+    // Reply count + latest reply time per post, one grouped query.
+    if (posts.length) {
+      const stats = await Reply.aggregate([
+        { $match: { post: { $in: posts.map((p) => p._id) } } },
+        { $group: { _id: '$post', n: { $sum: 1 }, last: { $max: '$createdAt' } } },
+      ]);
+      const byId = new Map(stats.map((s) => [String(s._id), s]));
+      posts.forEach((p) => {
+        const st = byId.get(String(p._id));
+        p.replyCount = st ? st.n : 0;
+        p.lastReplyAt = st ? st.last : null;
+      });
+    }
+
     return res.status(200).json({
       success: true,
       data: { posts },
@@ -437,6 +451,15 @@ const getSavedPosts = async (req, res) => {
     const posts = savedPosts.map((s) => s.post).filter(Boolean);
     await attachAuthorAvatars(posts);
 
+    if (posts.length) {
+      const counts = await Reply.aggregate([
+        { $match: { post: { $in: posts.map((p) => p._id) } } },
+        { $group: { _id: '$post', n: { $sum: 1 } } },
+      ]);
+      const byId = new Map(counts.map((c) => [String(c._id), c.n]));
+      posts.forEach((p) => { p.replyCount = byId.get(String(p._id)) || 0; });
+    }
+
     return res.status(200).json({
       success: true,
       data: { posts },
@@ -446,7 +469,29 @@ const getSavedPosts = async (req, res) => {
   }
 };
 
+// @desc    Delete own post (with its replies, saves and notifications)
+// @route   DELETE /api/posts/:id
+// @access  Private
+const deletePost = async (req, res) => {
+  try {
+    const post = await Post.findOne({ _id: req.params.id, author: req.user._id });
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+    await Promise.all([
+      Reply.deleteMany({ post: post._id }),
+      SavedPost.deleteMany({ post: post._id }),
+      Notification.deleteMany({ referenceId: post._id }),
+    ]);
+    await Post.deleteOne({ _id: post._id });
+    return res.status(200).json({ success: true, message: 'Post deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
+  deletePost,
   getPosts,
   createPost,
   updatePost,

@@ -499,6 +499,20 @@ export const postApi = {
     }
   },
 
+  deletePost: async (id: string) => {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}/posts/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || 'Failed to delete post');
+    return body;
+  },
+
   getReplies: async (postId: string) => {
     try {
       const token = await getToken();

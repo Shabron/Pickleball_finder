@@ -1,42 +1,38 @@
 /**
- * ForgotPasswordScreen — Request a password reset code
+ * ForgotPasswordScreen — v2
  *
- * Step 1 of the forgot-password flow: user enters their email,
- * we ask the backend to email a 6-digit reset code, then hand off
- * to ResetPasswordScreen to enter the code + new password.
+ * Step 1 of the reset flow: enter email → backend emails a 6-digit code →
+ * ResetPasswordScreen. Compact header, inline error, normal-case button.
  */
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
+import AuthHeader from '../../components/common/AuthHeader';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing } from '../../theme/spacing';
+import { spacing, borderRadius } from '../../theme/spacing';
 import { authApi } from '../../services/api';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function ForgotPasswordScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { colors, typography } = useTheme();
 
+  const valid = EMAIL_RE.test(email.trim());
+
   const handleSendCode = async () => {
-    if (!email.trim()) return;
+    if (!valid || loading) return;
     setLoading(true);
+    setError('');
     try {
       await authApi.forgotPassword(email.trim());
       navigation.navigate('ResetPassword', { email: email.trim() });
-    } catch (error: any) {
-      Alert.alert('Something went wrong', error.message || 'Failed to send reset code.');
+    } catch (e: any) {
+      setError(e?.message || "Couldn't send the code. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -44,58 +40,55 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
+          <AuthHeader
+            title="Forgot password?"
+            subtitle="Enter your email and we'll send you a 6-digit code to reset it."
+            onBack={() => navigation.goBack()}
+          />
 
-          <View style={styles.welcomeSection}>
-            <Text style={[typography.headlineMedium, styles.title]}>
-              Forgot Password?
-            </Text>
-            <Text style={[typography.bodyLarge, styles.subtitle]}>
-              Enter your email and we'll send you a code to reset your password.
-            </Text>
-          </View>
-
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Input
-              label="Email Address"
-              placeholder="Email Address"
+              label="Email"
+              placeholder="you@example.com"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={t => {
+                setEmail(t);
+                if (error) setError('');
+              }}
               keyboardType="email-address"
-              containerStyle={{ marginBottom: spacing.xl }}
+              autoComplete="email"
+              textContentType="emailAddress"
+              autoCorrect={false}
+              autoFocus
+              returnKeyType="send"
+              onSubmitEditing={handleSendCode}
             />
+
+            {!!error && (
+              <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
+                <Text style={[typography.bodyMedium, { color: colors.error }]}>{error}</Text>
+              </View>
+            )}
 
             <Button
-              title="SEND RESET CODE"
+              title="Send code"
               onPress={handleSendCode}
               loading={loading}
-              disabled={!email.trim()}
+              disabled={!valid || loading}
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+              textStyle={{ color: '#FFFFFF', fontWeight: '700' }}
             />
-
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Back to Log In</Text>
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity style={styles.backLink} onPress={() => navigation.navigate('Login')}>
+            <Text style={[typography.bodyLarge, { color: colors.primary, fontWeight: '700' }]}>Back to log in</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenWrapper>
@@ -103,56 +96,31 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  logo: {
-    width: 160,
-    height: 160,
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-  },
-  title: {
-    color: '#0F2C4C',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#1B1B1B',
-    marginTop: spacing.xs,
-    textAlign: 'center',
+    paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: spacing.xl,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
-    elevation: 4,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  errorBox: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.lg,
   },
   actionButton: {
     height: 52,
-    marginTop: spacing.xs,
+    marginTop: spacing.xl,
   },
-  footerLink: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  supportText: {
-    textDecorationLine: 'underline',
-    color: '#111827',
-    fontSize: 15,
+  backLink: {
+    alignSelf: 'center',
+    marginTop: spacing.xl,
   },
 });

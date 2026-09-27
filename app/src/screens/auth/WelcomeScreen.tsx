@@ -45,32 +45,29 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
         <View style={styles.mainSection}>
           <View style={styles.textSection}>
-            <Text style={[typography.headlineMedium, styles.title, { color: '#0F2C4C' }]}>
-              Senior Pickleball Partners
-            </Text>
-            <Text style={[typography.bodyLarge, styles.subtitle, { color: '#1B1B1B' }]}>
+            <Text style={[typography.titleLarge, styles.subtitle, { color: colors.onSurface }]}>
               Connect with friends, find matches, and stay active.
             </Text>
           </View>
 
           <View style={styles.buttonSection}>
             <Button
-              title="SIGN UP"
+              title="Create account"
               onPress={() => navigation.navigate('Signup')}
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+              textStyle={{ color: '#FFFFFF', fontWeight: '700' }}
             />
             <Button
-              title="LOG IN"
+              title="I already have an account"
               onPress={() => navigation.navigate('Login')}
-              style={[styles.actionButton, { backgroundColor: colors.secondary }]}
-              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+              style={[styles.actionButton, styles.secondaryButton, { backgroundColor: colors.surface }]}
+              textStyle={{ color: colors.primary, fontWeight: '700' }}
             />
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Text style={[typography.bodyMedium, styles.tagline, { color: '#1B1B1B' }]}>
+          <Text style={[typography.bodyMedium, styles.tagline, { color: colors.onSurfaceVariant }]}>
             Connecting Competitive Seniors{'\n'}On The Tournament Circuit
           </Text>
         </View>
@@ -97,8 +94,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   logo: {
-    width: 380, // Scaled up width ensures it looks large
-    height: 210,
+    width: 300,
+    height: 170,
   },
   imageWrapper: {
     width: '100%',
@@ -145,6 +142,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  secondaryButton: {
+    shadowOpacity: 0.08,
+    elevation: 1,
   },
   footer: {
     paddingHorizontal: spacing.lg,

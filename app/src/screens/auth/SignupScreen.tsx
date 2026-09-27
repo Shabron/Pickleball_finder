@@ -1,11 +1,11 @@
 /**
- * SignupScreen — Account creation with optional profile details
+ * SignupScreen — v2
  *
- * Matches Stitch "Login / Signup" design:
- * - Step-indicator-style form with clear sections
- * - All inputs use themed components
- * - State dropdown for location
- * - Responsive for all device sizes
+ *  - Compact header (back, "Create account", small logo) — no repeated hero or tabs
+ *  - Name, email, password, confirm; email format checked after leaving the field
+ *  - Live password rules (6+ characters, matches) — server minimum is 6
+ *  - No checkbox here: agreement happens once, on the next (Terms) screen
+ *  - Errors inline instead of pop-ups
  */
 import React, { useState } from 'react';
 import {
@@ -16,200 +16,178 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Image,
-  Alert,
   Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Mail, Lock, User, Phone, ArrowRight, Check } from 'lucide-react-native';
+import { Check, Circle } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
+import AuthHeader from '../../components/common/AuthHeader';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
-import Dropdown from '../../components/common/Dropdown';
-import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { authApi, setToken } from '../../services/api';
-import { API_BASE_URL } from '@env';
+import { spacing, borderRadius } from '../../theme/spacing';
+import { authApi } from '../../services/api';
 
-
+const SUPPORT_EMAIL = 'shauryamspp@gmail.com';
+const MIN_PASSWORD = 6;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function SignupScreen({ navigation }: any) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [emailTouched, setEmailTouched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { colors, typography } = useTheme();
 
-  const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const update = (field: keyof typeof form, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
   };
 
-  const isValid =
-    formData.name.trim() &&
-    formData.email.trim() &&
-    formData.password.trim() &&
-    formData.password === formData.confirmPassword &&
-    acceptedPrivacy;
+  const emailOk = EMAIL_RE.test(form.email.trim());
+  const longEnough = form.password.length >= MIN_PASSWORD;
+  const matches = !!form.confirmPassword && form.password === form.confirmPassword;
+  const isValid = !!form.name.trim() && emailOk && longEnough && matches;
 
   const handleSignup = async () => {
-    if (!isValid) return;
+    if (!isValid || loading) return;
     setLoading(true);
+    setError('');
     try {
-      const response = await authApi.signup(formData.name, formData.email, formData.password);
+      const response = await authApi.signup(form.name.trim(), form.email.trim(), form.password);
       const token = response.data?.token || response.token;
       const userData = response.data;
-
       if (token && userData) {
-        // Keep in local memory as requested
         await AsyncStorage.setItem('@pending_terms', JSON.stringify({ token, userData }));
-        // Navigate to the Terms acceptance screen instead of logging in directly
         navigation.navigate('Terms', { token, userData });
+      } else {
+        setError('Something went wrong. Please try again.');
       }
-    } catch (error: any) {
-      Alert.alert('Signup Failed', error.message || 'An error occurred during sign up.');
+    } catch (e: any) {
+      setError(e?.message || 'Could not create your account. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const Rule = ({ ok, label }: { ok: boolean; label: string }) => (
+    <View style={styles.ruleRow}>
+      {ok ? (
+        <Check size={16} color={colors.brandGreen} />
+      ) : (
+        <Circle size={14} color={colors.outline} style={{ marginHorizontal: 1 }} />
+      )}
+      <Text
+        style={[typography.bodySmall, { color: ok ? colors.brandGreen : colors.onSurfaceVariant, marginLeft: spacing.xs }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
   return (
     <ScreenWrapper>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ─── Header Logo ─── */}
-          <View style={styles.header}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
+          <AuthHeader
+            title="Create account"
+            subtitle="Free to join. Takes about a minute."
+            onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+          />
 
-          {/* ─── Welcome Header ─── */}
-          <View style={styles.welcomeSection}>
-            <Text style={[typography.headlineMedium, styles.title]}>
-              Welcome to the Court
-            </Text>
-            <Text style={[typography.bodyLarge, styles.subtitle]}>
-              Connect with friends and stay active.
-            </Text>
-          </View>
-
-          {/* ─── Card Form Section ─── */}
-          <View style={styles.card}>
-            {/* Tabs */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={styles.tabButton}
-                onPress={() => navigation.navigate('Login')}
-              >
-                <Text style={styles.tabText}>LOG IN</Text>
-              </TouchableOpacity>
-              <View style={[styles.tabButton, styles.activeTabWhite]}>
-                <Text style={[styles.tabText, styles.activeTabTextDark]}>SIGN UP</Text>
-              </View>
-            </View>
-
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Input
-              label="Full Name"
-              placeholder="Enter your full name"
-              icon={<User color={colors.onSurfaceVariant} size={sizes.iconSmall} />}
-              value={formData.name}
-              onChangeText={(t) => updateField('name', t)}
+              label="Your name"
+              placeholder="e.g. Mary Johnson"
+              value={form.name}
+              onChangeText={t => update('name', t)}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
               containerStyle={{ marginBottom: spacing.lg }}
             />
 
             <Input
-              label="Email Address"
-              placeholder="Email Address"
-              value={formData.email}
-              onChangeText={(t) => updateField('email', t)}
+              label="Email"
+              placeholder="you@example.com"
+              value={form.email}
+              onChangeText={t => update('email', t)}
+              onBlur={() => setEmailTouched(true)}
               keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
+              autoCorrect={false}
+              error={emailTouched && form.email.trim() && !emailOk ? 'Please enter a valid email address' : undefined}
               containerStyle={{ marginBottom: spacing.lg }}
             />
 
             <Input
-              label="Create Password"
-              placeholder="Create Password"
-              value={formData.password}
-              onChangeText={(t) => updateField('password', t)}
+              label="Create a password"
+              placeholder="At least 6 characters"
+              value={form.password}
+              onChangeText={t => update('password', t)}
               isPassword
+              autoComplete="password-new"
+              textContentType="newPassword"
               containerStyle={{ marginBottom: spacing.lg }}
             />
 
             <Input
-              label="Confirm Password"
-              placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChangeText={(t) => updateField('confirmPassword', t)}
+              label="Confirm password"
+              placeholder="Type it again"
+              value={form.confirmPassword}
+              onChangeText={t => update('confirmPassword', t)}
               isPassword
-              error={
-                formData.confirmPassword && formData.password !== formData.confirmPassword
-                  ? 'Passwords do not match'
-                  : undefined
-              }
-              containerStyle={{ marginBottom: spacing.xl }}
+              autoComplete="password-new"
+              textContentType="newPassword"
+              error={form.confirmPassword && !matches ? "Passwords don't match" : undefined}
             />
 
-
-
-            {/* Checkbox Section */}
-            <TouchableOpacity 
-              style={styles.checkboxContainer} 
-              onPress={() => setAcceptedPrivacy(!acceptedPrivacy)}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  { borderColor: acceptedPrivacy ? colors.primary : '#D1D5DB' },
-                  acceptedPrivacy && { backgroundColor: colors.primary }
-                ]}
-              >
-                {acceptedPrivacy && <Check color="white" size={14} />}
+            {!!form.password && (
+              <View style={styles.rules}>
+                <Rule ok={longEnough} label={`At least ${MIN_PASSWORD} characters`} />
+                <Rule ok={matches} label="Both passwords match" />
               </View>
-              <Text style={[typography.bodyMedium, styles.checkboxLabel]}>
-                I agree to the{' '}
-                <Text 
-                  style={[styles.linkText, { color: colors.primary }]}
-                  onPress={() => navigation.navigate('PrivacyPolicy')}
-                >
-                  Privacy Policy
-                </Text>
-              </Text>
-            </TouchableOpacity>
+            )}
 
-            {/* ─── Submit ─── */}
+            {!!error && (
+              <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
+                <Text style={[typography.bodyMedium, { color: colors.error }]}>{error}</Text>
+              </View>
+            )}
+
             <Button
-              title="JOIN THE COMMUNITY"
+              title="Continue"
               onPress={handleSignup}
               loading={loading}
-              disabled={!isValid}
+              disabled={!isValid || loading}
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              textStyle={{ color: '#FFFFFF', fontWeight: 'bold' }}
+              textStyle={{ color: '#FFFFFF', fontWeight: '700' }}
             />
-
-            {/* ─── Footer ─── */}
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={() => Linking.openURL('mailto:shauryamspp@gmail.com').catch(err => console.error(err))}
+            <Text
+              style={[typography.bodySmall, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.sm }]}
             >
-              <Text style={[styles.supportText, { color: colors.brandGreen }]}>Contact Senior Support</Text>
+              Next, you'll review our community guidelines.
+            </Text>
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>Already a member? </Text>
+            <TouchableOpacity onPress={() => navigation.replace('Login')}>
+              <Text style={[typography.bodyLarge, { color: colors.primary, fontWeight: '700' }]}>Log in</Text>
             </TouchableOpacity>
           </View>
+
+          <Text
+            style={[typography.bodyMedium, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.xl }]}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {})}
+          >
+            Need help? Contact support
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenWrapper>
@@ -217,108 +195,41 @@ export default function SignupScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  logo: {
-    width: 160,
-    height: 160,
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  title: {
-    color: '#0F2C4C',
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    color: '#1B1B1B',
-    marginTop: spacing.xs,
+    paddingBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: spacing.xl,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
-    elevation: 4,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: spacing.xxl,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTabWhite: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
-    shadowOffset: { width: 0, height: 1 },
   },
-  tabText: {
-    fontWeight: 'bold',
-    color: '#6B7280',
-    fontSize: 14,
+  rules: {
+    marginTop: spacing.md,
+    gap: 6,
   },
-  activeTabTextDark: {
-    color: '#111827',
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  errorBox: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.lg,
   },
   actionButton: {
     height: 52,
-    marginTop: spacing.md,
+    marginTop: spacing.xl,
   },
-  footerLink: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  supportText: {
-    textDecorationLine: 'underline',
-    color: '#111827',
-    fontSize: 15,
-  },
-  checkboxContainer: {
+  switchRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    marginRight: spacing.md,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  checkboxLabel: {
-    flex: 1,
-    color: '#374151',
-    fontWeight: '500',
-    lineHeight: 18,
-  },
-  linkText: {
-    textDecorationLine: 'underline',
-    fontWeight: '700',
+    flexWrap: 'wrap',
+    marginTop: spacing.xl,
   },
 });

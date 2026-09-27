@@ -403,7 +403,7 @@ export default function PostDetailScreen({ navigation, route }: any) {
             onChangeText={setReplyText}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder={`Reply to ${authorName.split(' ')[0]}…`}
+            placeholder={isOwn ? 'Write a reply…' : `Reply to ${authorName.split(' ')[0]}…`}
             placeholderTextColor={colors.onSurfaceVariant}
             multiline
             maxLength={500}

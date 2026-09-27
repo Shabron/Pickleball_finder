@@ -22,6 +22,10 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
@@ -196,29 +200,33 @@ export default function ProfileScreen({ navigation }: any) {
     try { await logout(); } catch (err) { console.error('Logout failed', err); }
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure? This permanently deletes your account and all data and cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'DELETE',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await authApi.deleteAccount();
-              await logout();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete account');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+  // Delete account: opens a sheet where the user must type DELETE to confirm.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const canDelete = deleteText.trim().toUpperCase() === 'DELETE';
+
+  const closeDelete = () => {
+    if (deleting) return;
+    setDeleteOpen(false);
+    setDeleteText('');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    try {
+      await authApi.deleteAccount();
+      setDeleteOpen(false);
+      await logout();
+    } catch (err: any) {
+      Alert.alert(
+        "Couldn't delete account",
+        err?.message || 'Please check your connection and try again.',
+      );
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // ─── Derived values ───────────────────────────────────────────────────────
@@ -242,21 +250,21 @@ export default function ProfileScreen({ navigation }: any) {
         onPress: () => navigation.navigate('SavedPosts'),
       },
       {
-        icon: <Bell size={sizes.iconSmall} color={colors.tertiary} />,
-        iconBg: colors.tertiaryContainer,
+        icon: <Bell size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
         label: 'Notifications',
         onPress: () => navigation.navigate('Notifications'),
         badge: unreadCount > 0 ? unreadCount : undefined,
       },
       {
-        icon: <Settings size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
-        iconBg: colors.surfaceContainerHigh,
+        icon: <Settings size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
         label: 'Notification Settings',
         onPress: () => navigation.navigate('NotificationSettings'),
       },
       {
-        icon: <Ban size={sizes.iconSmall} color={colors.error} />,
-        iconBg: colors.errorContainer,
+        icon: <Ban size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
         label: 'Blocked Users',
         onPress: () => navigation.navigate('BlockedUsers'),
       },
@@ -264,14 +272,14 @@ export default function ProfileScreen({ navigation }: any) {
     [
       profileData?.user?.emailVerified
         ? {
-            icon: <BadgeCheck size={sizes.iconSmall} color={colors.success} />,
-            iconBg: '#E8F5E9',
+            icon: <BadgeCheck size={sizes.iconSmall} color={colors.brandGreen} />,
+            iconBg: colors.brandGreenContainer,
             label: 'Email Verified',
             onPress: () => {},
           }
         : {
-            icon: <Mail size={sizes.iconSmall} color={colors.tertiary} />,
-            iconBg: colors.tertiaryContainer,
+            icon: <Mail size={sizes.iconSmall} color={colors.primary} />,
+            iconBg: colors.primaryContainer,
             label: 'Verify Email',
             onPress: () => navigation.navigate('VerifyEmail'),
           },
@@ -282,16 +290,24 @@ export default function ProfileScreen({ navigation }: any) {
         onPress: () => navigation.navigate('PrivacyPolicyInfo'),
       },
       {
-        icon: <FileText size={sizes.iconSmall} color={colors.secondary} />,
-        iconBg: colors.secondaryContainer,
+        icon: <FileText size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
         label: 'Terms & Conditions',
         onPress: () => navigation.navigate('TermsInfo'),
       },
       {
-        icon: <Info size={sizes.iconSmall} color={colors.onSurfaceVariant} />,
-        iconBg: colors.surfaceContainerHigh,
+        icon: <Info size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
         label: 'About the App',
         onPress: () => navigation.navigate('About'),
+      },
+    ],
+    [
+      {
+        icon: <LogOut size={sizes.iconSmall} color={colors.primary} />,
+        iconBg: colors.primaryContainer,
+        label: 'Log out',
+        onPress: handleLogout,
       },
     ],
   ];
@@ -440,30 +456,17 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
           ))}
 
-          {/* ─── Log out / Delete ─────────────────────────────────────── */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: colors.outline }]}
-              onPress={handleLogout}
-              activeOpacity={0.7}
-            >
-              <LogOut size={17} color={colors.primary} />
-              <Text style={[typography.labelLarge, { color: colors.primary, marginLeft: spacing.sm }]}>
-                Log Out
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: colors.errorContainer, backgroundColor: colors.errorContainer }]}
-              onPress={handleDeleteAccount}
-              activeOpacity={0.7}
-            >
-              <Trash2 size={17} color={colors.error} />
-              <Text style={[typography.labelLarge, { color: colors.error, marginLeft: spacing.sm }]}>
-                Delete
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* ─── Delete account: deliberately small and quiet ────────── */}
+          <TouchableOpacity
+            onPress={() => setDeleteOpen(true)}
+            activeOpacity={0.6}
+            style={styles.deleteLink}
+            hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          >
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, textDecorationLine: 'underline' }]}>
+              Delete account
+            </Text>
+          </TouchableOpacity>
 
           <Text
             style={[
@@ -475,6 +478,79 @@ export default function ProfileScreen({ navigation }: any) {
           </Text>
         </ScrollView>
       )}
+
+      <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={closeDelete}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalIcon, { backgroundColor: colors.errorContainer }]}>
+              <Trash2 size={22} color={colors.error} />
+            </View>
+            <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '700', textAlign: 'center' }]}>
+              Delete your account?
+            </Text>
+            <Text
+              style={[
+                typography.bodyMedium,
+                { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.sm },
+              ]}
+            >
+              Your profile, posts, messages and connections will be permanently removed. This can't be undone.
+            </Text>
+            <Text style={[typography.bodyMedium, { color: colors.onSurface, marginTop: spacing.lg }]}>
+              Type <Text style={{ fontWeight: '700' }}>DELETE</Text> to confirm
+            </Text>
+            <TextInput
+              value={deleteText}
+              onChangeText={setDeleteText}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!deleting}
+              placeholder="DELETE"
+              placeholderTextColor={colors.outline}
+              style={[
+                styles.modalInput,
+                typography.bodyLarge,
+                { color: colors.onSurface, backgroundColor: colors.surfaceContainer },
+              ]}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+                onPress={closeDelete}
+                disabled={deleting}
+                activeOpacity={0.7}
+              >
+                <Text style={[typography.labelLarge, { color: colors.onSurface }]}>Keep account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: canDelete ? colors.error : colors.surfaceContainerHigh },
+                ]}
+                onPress={handleDeleteAccount}
+                disabled={!canDelete || deleting}
+                activeOpacity={0.7}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text
+                    style={[
+                      typography.labelLarge,
+                      { color: canDelete ? '#FFFFFF' : colors.onSurfaceVariant },
+                    ]}
+                  >
+                    Delete
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScreenWrapper>
   );
 }
@@ -568,21 +644,48 @@ const styles = StyleSheet.create({
     marginRight: spacing.lg,
   },
 
-  // ─── Action row
-  actionRow: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    gap: spacing.md,
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
+  // ─── Delete account
+  deleteLink: {
+    alignSelf: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
-  actionBtn: {
+  modalBackdrop: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
+    padding: spacing.lg,
+  },
+  modalCard: {
     borderRadius: borderRadius.xl,
-    borderWidth: 1.5,
+    padding: spacing.lg,
+  },
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalInput: {
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    letterSpacing: 1,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  modalBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

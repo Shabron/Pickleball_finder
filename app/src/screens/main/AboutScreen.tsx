@@ -1,176 +1,160 @@
 /**
- * AboutScreen — About Senior Pickleball Partners
+ * AboutScreen — v2
  *
- * Matches Stitch "About Senior Pickleball Partners (Perfected)" design:
- * - Hero header with mission
- * - How-it-works steps
- * - Stats section
- * - Contact info
+ *  - Compact identity card with the real app logo (no banner, no 🏓 paddle)
+ *  - Mission, About the creator, How it works, Pickleball by the numbers,
+ *    Get in touch — all as white cards, same wording as v1
+ *  - Readable version line
  */
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Linking, TouchableOpacity } from 'react-native';
-import { Heart, Users, MapPin, MessageSquare, Shield, Mail, ExternalLink } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Linking, TouchableOpacity, Image } from 'react-native';
+import { Heart, Users, MapPin, MessageSquare, Mail, ChevronRight, User } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
-import Card from '../../components/common/Card';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, borderRadius, sizes } from '../../theme/spacing';
+import { spacing, borderRadius } from '../../theme/spacing';
+
+const SUPPORT_EMAIL = 'shauryamspp@gmail.com';
 
 export default function AboutScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
 
   const howItWorks = [
     {
-      icon: <Users size={28} color={colors.primary} />,
-      title: 'Create Your Profile',
+      icon: <Users size={20} color={colors.primary} />,
+      title: 'Create your profile',
       description: 'Sign up and tell us about your skill level, location, and when you like to play.',
     },
     {
-      icon: <MapPin size={28} color={colors.secondary} />,
-      title: 'Find Local Partners',
+      icon: <MapPin size={20} color={colors.primary} />,
+      title: 'Find local partners',
       description: 'Browse posts or get AI-matched with compatible players in your area.',
     },
     {
-      icon: <MessageSquare size={28} color={colors.tertiary} />,
-      title: 'Connect & Play',
+      icon: <MessageSquare size={20} color={colors.primary} />,
+      title: 'Connect & play',
       description: 'Message your matches, schedule a game, and hit the court together!',
     },
   ];
 
   const stats = [
-    { value: '36.5M', label: 'US Players' },
+    { value: '36.5M', label: 'US players' },
     { value: '60%+', label: 'Seniors (55+)' },
-    { value: '20%', label: 'YoY Growth' },
+    { value: '20%', label: 'Yearly growth' },
     { value: '50', label: 'States' },
   ];
+
+  const SectionTitle = ({ icon, children }: { icon: React.ReactNode; children: string }) => (
+    <View style={styles.sectionTitleRow}>
+      {icon}
+      <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '700', marginLeft: spacing.sm }]}>
+        {children}
+      </Text>
+    </View>
+  );
+
+  const body = [typography.bodyMedium, { color: colors.onSurfaceVariant, lineHeight: 22 }];
 
   return (
     <ScreenWrapper>
       <Header title="About" showBack onBack={() => navigation.goBack()} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ─── Hero ─── */}
-        <View style={[styles.hero, { backgroundColor: colors.primaryContainer }]}>
-          <Text style={{ fontSize: 48 }}>🏓</Text>
-          <Text style={[typography.headlineLarge, { color: colors.primary, marginTop: spacing.lg }]}>
-            Senior Pickleball
-          </Text>
-          <Text style={[typography.headlineSmall, { color: colors.onPrimaryContainer, marginTop: spacing.xs }]}>
-            Partners
-          </Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ─── Identity ─── */}
+        <View style={[styles.card, styles.identity, { backgroundColor: colors.surface }]}>
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+              Senior Pickleball Partners
+            </Text>
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+              Find a partner on the court, near you.
+            </Text>
+          </View>
         </View>
 
         {/* ─── Mission ─── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Heart size={22} color={colors.tertiary} />
-            <Text style={[typography.titleLarge, { color: colors.onSurface, marginLeft: spacing.sm }]}>
-              Our Mission
-            </Text>
-          </View>
-          <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant, lineHeight: 26 }]}>
-            Pickleball is one of the fastest growing sports, yet one of its largest demographics — seniors — remains heavily underserved. This is the first app specifically designed for senior pickleball players (50+).{'\n\n'}
-            Our goal is to provide a free, user-friendly platform that allows seniors to connect with other pickleball players in their geographic area — whether for local, state, or national tournaments, or simply for casual play!{'\n\n'}
-            Pickleball promotes cardiovascular fitness, fosters meaningful social connections, and has cognitive benefits that reduce the risk of cognitive decline. We believe every senior deserves a partner on the court.
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <SectionTitle icon={<Heart size={18} color={colors.primary} />}>Our mission</SectionTitle>
+          <Text style={body}>
+            Pickleball is one of the fastest growing sports, yet one of its largest demographics — seniors — remains
+            heavily underserved. This is the first app specifically designed for senior pickleball players (50+).
+            {'\n\n'}
+            Our goal is to provide a free, user-friendly platform that allows seniors to connect with other pickleball
+            players in their geographic area — whether for local, state, or national tournaments, or simply for casual
+            play!
+            {'\n\n'}
+            Pickleball promotes cardiovascular fitness, fosters meaningful social connections, and has cognitive
+            benefits that reduce the risk of cognitive decline. We believe every senior deserves a partner on the court.
           </Text>
         </View>
 
-        {/* ─── About the Creator ─── */}
-        <View style={[styles.creatorSection, { backgroundColor: colors.primaryContainer }]}>
-          <View style={styles.sectionHeader}>
-            <Users size={22} color={colors.primary} />
-            <Text style={[typography.titleLarge, { color: colors.onPrimaryContainer, marginLeft: spacing.sm }]}>
-              About the Creator
-            </Text>
-          </View>
-          <Text style={[typography.bodyLarge, { color: colors.onPrimaryContainer, lineHeight: 26 }]}>
-            Hi! I'm Shaurya Madiraju, a senior in high school from New Jersey, personally inspired by my grandmother to build this app. I wanted it as a means to show support for those who once cared for us.{'\n\n'}
-            I am consistently striving to promote both mental and physical fitness in seniors through volunteering efforts within my local community, and I'd love to scale this app nationally.{'\n\n'}
-            {/*💛 First-year subscription proceeds will be donated to{' '}*/}
-            {/*<Text style={{ fontWeight: '700' }}>North Jersey Villages</Text>*/}
-            {/*{' '}— a nonprofit committed to helping seniors age-in-place that I currently volunteer for.*/}
+        {/* ─── Creator ─── */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <SectionTitle icon={<User size={18} color={colors.primary} />}>About the creator</SectionTitle>
+          <Text style={body}>
+            Hi! I'm Shaurya Madiraju, a senior in high school from New Jersey, personally inspired by my grandmother to
+            build this app. I wanted it as a means to show support for those who once cared for us.
+            {'\n\n'}
+            I am consistently striving to promote both mental and physical fitness in seniors through volunteering
+            efforts within my local community, and I'd love to scale this app nationally.
           </Text>
         </View>
 
-        {/* ─── How It Works ─── */}
-        <View style={styles.section}>
-          <Text style={[typography.titleLarge, { color: colors.onSurface, marginBottom: spacing.xl }]}>
-            How It Works
-          </Text>
-
+        {/* ─── How it works ─── */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <SectionTitle icon={<MapPin size={18} color={colors.primary} />}>How it works</SectionTitle>
           {howItWorks.map((step, i) => (
-            <Card key={i} elevation={1}>
-              <View style={styles.stepRow}>
-                <View
-                  style={[styles.stepIcon, { backgroundColor: colors.surfaceContainerHigh }]}
-                >
-                  {step.icon}
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={[typography.titleMedium, { color: colors.onSurface }]}>
-                    {i + 1}. {step.title}
-                  </Text>
-                  <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xs }]}>
-                    {step.description}
-                  </Text>
-                </View>
+            <View key={i} style={[styles.stepRow, i > 0 && { marginTop: spacing.md }]}>
+              <View style={[styles.stepIcon, { backgroundColor: colors.primaryContainer }]}>{step.icon}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '600' }]}>
+                  {i + 1}. {step.title}
+                </Text>
+                <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+                  {step.description}
+                </Text>
               </View>
-            </Card>
+            </View>
           ))}
         </View>
 
-        {/* ─── Stats ─── */}
-        <View style={[styles.statsSection, { backgroundColor: colors.surfaceContainerLow }]}>
-          <Text style={[typography.titleLarge, { color: colors.onSurface, marginBottom: spacing.xl, textAlign: 'center' }]}>
-            Pickleball by the Numbers
+        {/* ─── Numbers ─── */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '700', marginBottom: spacing.sm }]}>
+            Pickleball by the numbers
           </Text>
           <View style={styles.statsGrid}>
             {stats.map((stat, i) => (
               <View key={i} style={styles.statItem}>
-                <Text style={[typography.headlineMedium, { color: colors.primary }]}>
-                  {stat.value}
-                </Text>
-                <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>
-                  {stat.label}
-                </Text>
+                <Text style={[typography.headlineSmall, { color: colors.primary, fontWeight: '700' }]}>{stat.value}</Text>
+                <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 2 }]}>{stat.label}</Text>
               </View>
             ))}
           </View>
         </View>
 
         {/* ─── Contact ─── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Mail size={22} color={colors.secondary} />
-            <Text style={[typography.titleLarge, { color: colors.onSurface, marginLeft: spacing.sm }]}>
-              Get in Touch
-            </Text>
+        <TouchableOpacity
+          style={[styles.card, styles.contactRow, { backgroundColor: colors.surface }]}
+          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.stepIcon, { backgroundColor: colors.primaryContainer }]}>
+            <Mail size={20} color={colors.primary} />
           </View>
-          <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>
-            Have a question, suggestion, or just want to say hi?
-          </Text>
-          <TouchableOpacity
-            style={[styles.contactLink, { backgroundColor: colors.secondaryContainer }]}
-            onPress={() => Linking.openURL('mailto:shauryamspp@gmail.com')}
-          >
-            <Text style={[typography.titleSmall, { color: colors.onSecondaryContainer }]}>
-              shauryamspp@gmail.com
-            </Text>
-            <ExternalLink size={16} color={colors.onSecondaryContainer} />
-          </TouchableOpacity>
-        </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '600' }]}>Get in touch</Text>
+            <Text style={[typography.bodyMedium, { color: colors.primary, marginTop: 2 }]}>{SUPPORT_EMAIL}</Text>
+          </View>
+          <ChevronRight size={18} color={colors.onSurfaceVariant} />
+        </TouchableOpacity>
 
         {/* ─── Footer ─── */}
-        <View style={styles.footer}>
-          <Shield size={16} color={colors.onSurfaceVariant} />
-          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
-            Made with ❤️ for the senior pickleball community
-          </Text>
-        </View>
-        <Text style={[typography.labelSmall, { color: colors.outlineVariant, textAlign: 'center', marginTop: spacing.sm }]}>
+        <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.md }]}>
+          Made with ❤️ for the senior pickleball community
+        </Text>
+        <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: 4 }]}>
           Version 1.0.0
         </Text>
       </ScrollView>
@@ -179,53 +163,46 @@ export default function AboutScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.massive,
   },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: spacing.giant,
-    borderBottomLeftRadius: borderRadius.xxl,
-    borderBottomRightRadius: borderRadius.xxl,
-    marginBottom: spacing.xxl,
+  card: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  section: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.xxl,
-  },
-  creatorSection: {
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.xxl,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
-    borderRadius: borderRadius.xxl,
-  },
-  sectionHeader: {
+  identity: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   stepRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: spacing.md,
   },
   stepIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.lg,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  statsSection: {
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.xxl,
-    borderRadius: borderRadius.xxl,
-    marginHorizontal: spacing.lg,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -234,23 +211,11 @@ const styles = StyleSheet.create({
   statItem: {
     width: '50%',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  contactLink: {
+  contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.full,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xxl,
+    gap: spacing.md,
   },
 });

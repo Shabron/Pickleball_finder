@@ -13,6 +13,7 @@ const {
   savePost,
   unsavePost,
   getSavedPosts,
+  deletePost,
 } = require('../controllers/postController');
 
 // GET /api/posts/my — list logged in user's posts
@@ -44,6 +45,9 @@ router.post('/', protect, createPost);
 
 // PUT /api/posts/:id — update your own post
 router.put('/:id', protect, updatePost);
+
+// DELETE /api/posts/:id — delete your own post
+router.delete('/:id', protect, deletePost);
 
 module.exports = router;
 
