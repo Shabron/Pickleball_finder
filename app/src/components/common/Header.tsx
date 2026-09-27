@@ -48,7 +48,7 @@ export default function Header({
     <View
       style={[
         styles.container,
-        { backgroundColor: '#FFFFFF' },
+        { backgroundColor: 'transparent' },
         style,
       ]}
     >
@@ -79,7 +79,10 @@ export default function Header({
           />
         )}
         <Text
-          style={[typography.titleLarge, { color: '#0F2C4C', marginLeft: showLogo ? 6 : 0 }]}
+          style={[
+            typography.titleMedium,
+            { color: colors.onPrimaryContainer, fontWeight: '700', marginLeft: showLogo ? spacing.sm : 0, flexShrink: 1 },
+          ]}
           numberOfLines={1}
         >
           {title}
@@ -91,13 +94,14 @@ export default function Header({
         {showNotificationBell && (
           <TouchableOpacity
             onPress={onNotificationPress}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={styles.bellContainer}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            style={[styles.bellButton, { backgroundColor: colors.surface }]}
           >
-            <Bell color={colors.onSurface} size={sizes.iconDefault} />
+            <Bell color={colors.onSurface} size={20} />
             {notificationCount > 0 && (
-              <View style={[styles.notifBadge, { backgroundColor: colors.tertiary }]}>
-                <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 9 }]}>
+              <View style={[styles.notifBadge, { backgroundColor: colors.tertiary, borderColor: colors.surface }]}>
+                <Text style={[typography.labelSmall, { color: colors.onTertiary, fontSize: 9, lineHeight: 12 }]}>
                   {notificationCount > 9 ? '9+' : notificationCount}
                 </Text>
               </View>
@@ -135,8 +139,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   logo: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
   },
   backButton: {
     padding: spacing.xs,
@@ -144,17 +148,21 @@ const styles = StyleSheet.create({
   backPlaceholder: {
     width: 28,
   },
-  bellContainer: {
-    position: 'relative',
-    padding: spacing.xs,
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notifBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 4,
+    right: 4,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 3,

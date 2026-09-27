@@ -20,7 +20,7 @@ import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-const AnimatedTabIcon = ({ focused, routeName, colors, typography }) => {
+const AnimatedTabIcon = ({ focused, routeName, colors, typography }: any) => {
   let IconComponent;
   let label;
   if (routeName === 'Home') { IconComponent = Home; label = 'Home'; }
@@ -29,83 +29,61 @@ const AnimatedTabIcon = ({ focused, routeName, colors, typography }) => {
   else if (routeName === 'Messages') { IconComponent = Mail; label = 'Messages'; }
   else if (routeName === 'Profile') { IconComponent = User; label = 'Profile'; }
 
-  if (!IconComponent) return null;
-
   const anim = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.spring(anim, {
       toValue: focused ? 1 : 0,
       useNativeDriver: true,
-      friction: 6,
-      tension: 60,
+      friction: 7,
+      tension: 80,
     }).start();
   }, [focused, anim]);
 
-  const scale = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.1]
-  });
-  
-  const translateY = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -3]
-  });
+  if (!IconComponent) return null;
 
-  const dotOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1]
-  });
-
-  const dotScale = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1]
-  });
+  // Pill grows horizontally from the centre behind the active icon
+  const pillScaleX = anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
 
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: 64, height: 50 }}>
-      <Animated.View style={{ 
-          transform: [{ scale }, { translateY }], 
-          alignItems: 'center', 
-          justifyContent: 'center',
-        }}>
+    <View style={tabStyles.item}>
+      <View style={tabStyles.iconSlot}>
+        <Animated.View
+          style={[
+            tabStyles.pill,
+            { backgroundColor: colors.primaryContainer, opacity: anim, transform: [{ scaleX: pillScaleX }] },
+          ]}
+        />
         <IconComponent
           color={focused ? colors.primary : colors.onSurfaceVariant}
-          size={24}
-          strokeWidth={focused ? 2.5 : 2}
+          size={22}
+          strokeWidth={focused ? 2.4 : 2}
         />
-        <Text
-          style={{
-            ...typography.labelSmall,
-            color: focused ? colors.primary : colors.onSurfaceVariant,
-            fontWeight: focused ? '700' : '500',
-            marginTop: 4,
-            fontSize: 11,
-          }}
-        >
-          {label}
-        </Text>
-      </Animated.View>
-      
-      {/* Animated Dot Indicator */}
-      <Animated.View 
+      </View>
+      <Text
+        numberOfLines={1}
         style={{
-          position: 'absolute',
-          bottom: 0,
-          width: 5,
-          height: 5,
-          borderRadius: 2.5,
-          backgroundColor: colors.primary,
-          opacity: dotOpacity,
-          transform: [{ scale: dotScale }]
+          ...typography.labelSmall,
+          color: focused ? colors.primary : colors.onSurfaceVariant,
+          fontWeight: focused ? '700' : '500',
+          marginTop: 4,
+          fontSize: 11,
         }}
-      />
+      >
+        {label}
+      </Text>
     </View>
   );
 };
 
+const tabStyles = StyleSheet.create({
+  item: { alignItems: 'center', justifyContent: 'center', width: 72 },
+  iconSlot: { width: 56, height: 30, alignItems: 'center', justifyContent: 'center' },
+  pill: { ...StyleSheet.absoluteFillObject, borderRadius: 15 },
+});
+
 export default function TabNavigator() {
-  const { colors, typography, sizes } = useTheme();
+  const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -114,19 +92,20 @@ export default function TabNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          borderTopWidth: 1,
-          borderTopColor: colors.surfaceVariant,
-          backgroundColor: colors.surfaceContainerLow,
-          height: sizes.tabBarHeight + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
-          paddingTop: 8,
-          // Ambient shadow
+          borderTopWidth: 0,
+          backgroundColor: colors.surface,
+          height: 64 + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 0,
+          // Soft upward shadow instead of a hairline border
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.04,
-          shadowRadius: 12,
-          elevation: 8,
+          shadowOpacity: 0.06,
+          shadowRadius: 10,
+          elevation: 12,
         },
+        tabBarItemStyle: { height: 64, justifyContent: 'center', alignItems: 'center' },
+        tabBarIconStyle: { width: 72, height: 52, marginTop: 0 },
         tabBarIcon: ({ focused }) => (
           <AnimatedTabIcon 
             focused={focused} 

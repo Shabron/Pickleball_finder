@@ -1,19 +1,22 @@
 /**
- * PartnerPostCard — Post card with inline collapsible replies
+ * PartnerPostCard — feed card (v2)
  *
- * Follows Stitch "No-Line Rule" — uses tonal layering for action separator.
- * XL corners, theme-aware colors, accessible touch targets.
- * Replies expand inline Facebook-style below the card actions.
+ *  - Clean white card, shadow only (no accent bars / borders)
+ *  - Colour-coded skill chip + play-style chip instead of "Level advanced"
+ *  - Location with icon, distance highlighted
+ *  - Press feedback: card gently scales down while touched
+ *  - Actions: Reply (with live count) · Save · Message (primary CTA)
+ *  - Hides the author's own Message button on their own post
  */
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { MessageSquare, Bookmark, CornerUpLeft } from 'lucide-react-native';
-import Card from './common/Card';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, Alert } from 'react-native';
+import { MessageSquare, Bookmark, CornerUpLeft, MapPin } from 'lucide-react-native';
 import Avatar from './common/Avatar';
 import InlineReplies, { InlineRepliesHandle } from './InlineReplies';
 import { postApi, getToken } from '../services/api';
+import { getSkillLevelLabel } from '../constants/skillLevels';
 import { useTheme } from '../theme/ThemeContext';
-import { spacing } from '../theme/spacing';
+import { spacing, borderRadius } from '../theme/spacing';
 
 export interface PartnerPostData {
   id: string;
@@ -24,6 +27,10 @@ export interface PartnerPostData {
   avatarUri?: string;
   playStyle?: string;
   location?: string;
+  /** e.g. "3.2 mi away" — shown highlighted next to the location */
+  distance?: string;
+  replyCount?: number;
+  isOwn?: boolean;
 }
 
 interface PartnerPostCardProps {
@@ -33,15 +40,33 @@ interface PartnerPostCardProps {
   onPress?: () => void;
 }
 
-export default function PartnerPostCard({
-  post,
-  initialSaved = false,
-  onMessage,
-  onPress,
-}: PartnerPostCardProps) {
+const PLAY_STYLE_LABELS: Record<string, string> = {
+  singles: 'Singles',
+  doubles: 'Doubles',
+  mixed: 'Mixed',
+  any: 'Any style',
+};
+
+function PartnerPostCard({ post, initialSaved = false, onMessage, onPress }: PartnerPostCardProps) {
   const { colors, typography } = useTheme();
   const inlineRepliesRef = useRef<InlineRepliesHandle>(null);
   const [saved, setSaved] = useState(initialSaved);
+  const scale = useRef(new Animated.Value(1)).current;
+
+  // Skill → colour, all from the existing palette
+  const skillTone: Record<string, { bg: string; fg: string }> = {
+    beginner: { bg: colors.brandGreenContainer, fg: colors.onBrandGreenContainer },
+    lowIntermediate: { bg: colors.secondaryContainer, fg: colors.onSecondaryContainer },
+    highIntermediate: { bg: colors.primaryContainer, fg: colors.onPrimaryContainer },
+    advanced: { bg: colors.tertiaryContainer, fg: colors.onTertiaryContainer },
+    professional: { bg: colors.errorContainer, fg: colors.onErrorContainer },
+  };
+  const tone = skillTone[post.level] || { bg: colors.surfaceContainer, fg: colors.onSurfaceVariant };
+
+  const pressIn = () =>
+    Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
+  const pressOut = () =>
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
 
   const handleSaveToggle = async () => {
     const token = await getToken();
@@ -49,95 +74,92 @@ export default function PartnerPostCard({
       Alert.alert('Sign in required', 'Please log in to save this post.');
       return;
     }
-
-    const nextSaved = !saved;
-    setSaved(nextSaved);
+    const next = !saved;
+    setSaved(next); // optimistic
     try {
-      if (nextSaved) {
-        await postApi.savePost(post.id);
-      } else {
-        await postApi.unsavePost(post.id);
-      }
+      if (next) await postApi.savePost(post.id);
+      else await postApi.unsavePost(post.id);
     } catch (error: any) {
-      setSaved(!nextSaved);
+      setSaved(!next);
       Alert.alert('Error', error.message || 'Failed to update saved post');
     }
   };
 
+  const replyCount = post.replyCount ?? 0;
+
   return (
-    <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
-      <View style={styles.cardAccentWrapper}>
-        {/* Green left accent bar */}
-        <View style={[styles.leftAccentBar, { backgroundColor: colors.brandGreen }]} />
-        <Card style={{ marginBottom: 0 }}>
-        {/* Header: Avatar + Name + Time */}
+    <Animated.View style={[styles.shadowWrap, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPress ? pressIn : undefined}
+        onPressOut={onPress ? pressOut : undefined}
+        style={[styles.card, { backgroundColor: colors.surface }]}
+      >
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <Avatar name={post.name} uri={post.avatarUri} size={46} />
+          <Avatar name={post.name} uri={post.avatarUri} size={44} />
           <View style={styles.headerText}>
             <View style={styles.nameRow}>
-              <Text style={[typography.titleSmall, { color: colors.onSurface }]}>
+              <Text style={[typography.titleSmall, { color: colors.onSurface, flex: 1 }]} numberOfLines={1}>
                 {post.name}
               </Text>
-              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: spacing.sm }]}>
                 {post.timeAgo}
               </Text>
             </View>
-            <View style={styles.badgeRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.tertiary, marginRight: 4, opacity: 0.8 }} />
-                <Text style={[typography.labelMedium, { color: colors.onSurface }]}>Level {post.level}</Text>
+            <View style={styles.chipRow}>
+              <View style={[styles.chip, { backgroundColor: tone.bg }]}>
+                <Text style={[typography.labelSmall, { color: tone.fg }]}>{getSkillLevelLabel(post.level)}</Text>
               </View>
+              {post.playStyle && PLAY_STYLE_LABELS[post.playStyle] && (
+                <View style={[styles.chip, { backgroundColor: colors.surfaceContainer }]}>
+                  <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+                    {PLAY_STYLE_LABELS[post.playStyle]}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
-        {/* Content */}
-        <Text style={[typography.bodyLarge, { color: colors.onSurface, marginBottom: spacing.lg }]}>
+        {/* ── Content ── */}
+        <Text style={[typography.bodyLarge, styles.content, { color: colors.onSurface }]} numberOfLines={4}>
           {post.content}
         </Text>
 
-        {/* Location */}
-        {post.location && (
-          <Text
-            style={[
-              typography.labelMedium,
-              { color: colors.onSurfaceVariant, marginBottom: spacing.md },
-            ]}
-          >
-            📍 {post.location}
-          </Text>
+        {/* ── Location ── */}
+        {!!post.location && (
+          <View style={styles.locationRow}>
+            <MapPin size={14} color={colors.onSurfaceVariant} />
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: 4 }]} numberOfLines={1}>
+              {post.location}
+            </Text>
+            {!!post.distance && (
+              <Text style={[typography.labelMedium, { color: colors.primary, marginLeft: 6 }]}>· {post.distance}</Text>
+            )}
+          </View>
         )}
 
-        {/* Actions — separated by tonal shift */}
-        <View
-          style={[
-            styles.actions,
-            { backgroundColor: colors.surfaceContainerLow },
-          ]}
-        >
-          {/* Reply action — clicking opens compose inline */}
+        {/* ── Actions ── */}
+        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+        <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              // Stop card press from firing
-              e.stopPropagation?.();
-              inlineRepliesRef.current?.openReply();
-            }}
+            style={styles.actionBtn}
+            onPress={() => inlineRepliesRef.current?.openReply()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.6}
           >
             <CornerUpLeft size={18} color={colors.onSurfaceVariant} />
-            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
-              Reply
+            <Text style={[typography.labelLarge, styles.actionLabel, { color: colors.onSurfaceVariant }]}>
+              {replyCount > 0 ? `Reply · ${replyCount}` : 'Reply'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              handleSaveToggle();
-            }}
+            style={styles.actionBtn}
+            onPress={handleSaveToggle}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.6}
           >
             <Bookmark
               size={18}
@@ -145,81 +167,103 @@ export default function PartnerPostCard({
               fill={saved ? colors.primary : 'none'}
             />
             <Text
-              style={[
-                typography.labelMedium,
-                { color: saved ? colors.primary : colors.onSurfaceVariant, marginLeft: spacing.xs },
-              ]}
+              style={[typography.labelLarge, styles.actionLabel, { color: saved ? colors.primary : colors.onSurfaceVariant }]}
             >
               {saved ? 'Saved' : 'Save'}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={onMessage}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MessageSquare size={18} color={colors.onSurfaceVariant} />
-            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
-              Message
-            </Text>
-          </TouchableOpacity>
+          {!post.isOwn && onMessage && (
+            <TouchableOpacity
+              style={[styles.messageBtn, { backgroundColor: colors.primaryContainer }]}
+              onPress={onMessage}
+              activeOpacity={0.7}
+            >
+              <MessageSquare size={16} color={colors.primary} />
+              <Text style={[typography.labelLarge, styles.actionLabel, { color: colors.primary }]}>Message</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* ── Inline Replies (Facebook-style) ── */}
-        <InlineReplies ref={inlineRepliesRef} postId={post.id} />
-      </Card>
-      </View>
-    </TouchableOpacity>
+        {/* ── Inline replies ── */}
+        <InlineReplies ref={inlineRepliesRef} postId={post.id} initialCount={replyCount} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
+// Memoised: FlatList re-renders stay cheap while scrolling
+export default React.memo(PartnerPostCard);
+
 const styles = StyleSheet.create({
-  cardAccentWrapper: {
-    position: 'relative',
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
+  shadowWrap: {
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  leftAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    zIndex: 1,
+  card: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
   },
   header: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    alignItems: 'center',
   },
   headerText: {
     flex: 1,
     marginLeft: spacing.md,
-    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
   },
-  badgeRow: {
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+  },
+  content: {
+    marginTop: spacing.md,
+  },
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: spacing.md,
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.md,
-    borderRadius: 16,
-    marginTop: spacing.xs,
-    marginHorizontal: -spacing.sm,
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
   },
-  actionButton: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
+  },
+  actionLabel: {
+    marginLeft: 6,
+  },
+  messageBtn: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
   },
 });

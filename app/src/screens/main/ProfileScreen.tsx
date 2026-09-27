@@ -1,13 +1,16 @@
 /**
- * ProfileScreen — v2 Redesign
+ * ProfileScreen — v3 (compact redesign)
  *
- * Visual changes:
- *  - Blue court-line cover header with avatar overlapping the seam
- *  - Real stats wired from backend (posts count, accepted connections)
- *  - Star rating shown only when user has been rated
- *  - Animated stat counters on mount (pure RN Animated — no Reanimated yet)
- *  - Menu items grouped into visual card blocks with inner dividers
- *  - Inline action buttons (Log Out / Delete) instead of full-width pills
+ * Profile card changes vs v2:
+ *  - Removed oversized cover band — replaced with a slim 4px primary accent
+ *    strip at the top of the card
+ *  - Avatar sits LEFT in a horizontal row with name + email to the right
+ *    (no photo → Avatar component shows initials automatically, e.g. "P")
+ *  - Edit Profile button is compact and sits inside the card, right-aligned
+ *  - Chips row below the row, wraps naturally
+ *  - Rating shows inline only if user has been rated
+ *  - Stat boxes keep the animated counter with a coloured top-accent border
+ *  - Menu groups and action row unchanged from v2
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
@@ -40,26 +43,30 @@ import {
   Star,
   Users,
   ClipboardList,
+  Pencil,
 } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Avatar from '../../components/common/Avatar';
 import Badge from '../../components/common/Badge';
-import Button from '../../components/common/Button';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius, sizes } from '../../theme/spacing';
 
-// ─── Animated counting stat box ───────────────────────────────────────────────
+// ─── Animated counting stat tile (tappable) ───────────────────────────────────
 function AnimatedStat({
   value,
   label,
   color,
+  tint,
   icon,
+  onPress,
 }: {
   value: number;
   label: string;
   color: string;
+  tint: string;
   icon: React.ReactNode;
+  onPress: () => void;
 }) {
   const { colors, typography } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
@@ -67,31 +74,40 @@ function AnimatedStat({
 
   useEffect(() => {
     anim.setValue(0);
-    Animated.timing(anim, {
-      toValue: value,
-      duration: 800,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(anim, { toValue: value, duration: 700, useNativeDriver: false }).start();
     const id = anim.addListener(({ value: v }) => setDisplayed(Math.round(v)));
     return () => anim.removeListener(id);
   }, [value]);
 
+  // NOTE: background must be fully opaque — Android draws `elevation` shadows
+  // *through* translucent fills, which produced the grey boxes.
   return (
-    <View style={[statStyles.box, { backgroundColor: colors.surfaceContainerLowest }]}>
-      <View style={[statStyles.iconRing, { backgroundColor: color + '1A' }]}>{icon}</View>
-      <Text style={[typography.headlineSmall, { color, marginTop: spacing.xs }]}>{displayed}</Text>
-      <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
-        {label}
-      </Text>
-    </View>
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={onPress}
+      style={[statStyles.box, { backgroundColor: colors.surface }]}
+    >
+      <View style={[statStyles.iconRing, { backgroundColor: tint }]}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '700' }]}>
+          {displayed}
+        </Text>
+        <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 const statStyles = StyleSheet.create({
   box: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -100,43 +116,35 @@ const statStyles = StyleSheet.create({
     elevation: 2,
   },
   iconRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
 });
 
-// ─── Star rating strip ────────────────────────────────────────────────────────
-function StarRating({
-  avg,
-  count,
-  colors,
-  typography,
-}: {
-  avg: number;
-  count: number;
-  colors: any;
-  typography: any;
-}) {
+// ─── Inline star rating ───────────────────────────────────────────────────────
+function StarRating({ avg, count }: { avg: number; count: number }) {
+  const { colors, typography } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }}>
+    <View style={starStyles.row}>
       {[1, 2, 3, 4, 5].map((s) => (
         <Star
           key={s}
-          size={15}
+          size={13}
           color="#D69E2E"
           fill={s <= Math.round(avg) ? '#D69E2E' : 'transparent'}
           strokeWidth={1.5}
         />
       ))}
-      <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: spacing.xs }]}>
+      <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: 4 }]}>
         {avg.toFixed(1)} · {count} {count === 1 ? 'rating' : 'ratings'}
       </Text>
     </View>
   );
 }
+const starStyles = StyleSheet.create({ row: { flexDirection: 'row', alignItems: 'center', marginTop: 4 } });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: any) {
@@ -149,34 +157,27 @@ export default function ProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const coverFade = useRef(new Animated.Value(0)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
 
-  const formatSkillLevel = (level: string) => {
-    const map: Record<string, string> = {
-      beginner: 'Beginner',
-      lowIntermediate: 'Low Intermediate',
-      highIntermediate: 'High Intermediate',
-      advanced: 'Advanced',
-      professional: 'Pro',
-    };
-    return map[level] || level;
-  };
+  const formatSkillLevel = (level: string) => ({
+    beginner: 'Beginner',
+    lowIntermediate: 'Low Intermediate',
+    highIntermediate: 'High Intermediate',
+    advanced: 'Advanced',
+    professional: 'Pro',
+  }[level] || level);
 
-  const formatPlayStyle = (style: string) => {
-    const map: Record<string, string> = {
-      singles: 'Singles',
-      doubles: 'Doubles',
-      mixed: 'Mixed',
-      any: 'Any Style',
-    };
-    return map[style] || style;
-  };
+  const formatPlayStyle = (style: string) => ({
+    singles: 'Singles',
+    doubles: 'Doubles',
+    mixed: 'Mixed',
+    any: 'Any Style',
+  }[style] || style);
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      coverFade.setValue(0);
-
+      cardAnim.setValue(0);
       profileApi
         .getProfile()
         .then((res) => {
@@ -184,11 +185,7 @@ export default function ProfileScreen({ navigation }: any) {
           setUnreadCount(res.unreadNotificationsCount || 0);
           setPostCount(res.postCount ?? 0);
           setConnectionCount(res.connectionCount ?? 0);
-          Animated.timing(coverFade, {
-            toValue: 1,
-            duration: 350,
-            useNativeDriver: true,
-          }).start();
+          Animated.timing(cardAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
         })
         .catch((err) => console.error('Failed to load profile', err))
         .finally(() => setLoading(false));
@@ -196,17 +193,13 @@ export default function ProfileScreen({ navigation }: any) {
   );
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (err) {
-      console.error('Logout failed', err);
-    }
+    try { await logout(); } catch (err) { console.error('Logout failed', err); }
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'Are you sure you want to permanently delete your account and all data? This cannot be undone.',
+      'Are you sure? This permanently deletes your account and all data and cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -228,15 +221,16 @@ export default function ProfileScreen({ navigation }: any) {
     );
   };
 
-  // ─── Derived values
+  // ─── Derived values ───────────────────────────────────────────────────────
   const avatarUrl = profileData?.avatar
     ? `${API_BASE_URL.replace(/\/api$/, '')}${profileData.avatar}`
     : undefined;
+  // No photo → Avatar component automatically shows name initials (e.g. "P" for Pankaj)
   const userName = profileData?.user?.name || user?.name || 'Pickleball Player';
   const userEmail = profileData?.user?.email || user?.email || '';
   const hasRating = (profileData?.ratingCount ?? 0) > 0;
 
-  // ─── Menu groups (two visual blocks) ─────────────────────────────────────
+  // ─── Menu groups ──────────────────────────────────────────────────────────
   const menuGroups: Array<
     Array<{ icon: React.ReactNode; iconBg: string; label: string; onPress: () => void; badge?: number }>
   > = [
@@ -312,101 +306,101 @@ export default function ProfileScreen({ navigation }: any) {
       />
 
       {loading ? (
-        <View style={styles.loaderContainer}>
+        <View style={styles.loader}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* ─── Profile card with blue cover ─── */}
+          {/* ─── Profile card ─────────────────────────────────────────── */}
           <Animated.View
             style={[
               styles.profileCard,
-              { backgroundColor: colors.surfaceContainerLowest, opacity: coverFade },
+              { backgroundColor: colors.surface, opacity: cardAnim },
             ]}
           >
-            {/* Court-patterned cover band */}
-            <View style={[styles.coverBand, { backgroundColor: colors.primary }]}>
-              <View style={[styles.courtHorizLine, { borderColor: 'rgba(255,255,255,0.15)' }]} />
-              <View style={[styles.courtVertLine,  { borderColor: 'rgba(255,255,255,0.15)' }]} />
-              <View style={[styles.courtCircle,    { borderColor: 'rgba(255,255,255,0.12)' }]} />
-            </View>
+            {/* Horizontal row: avatar left, text right */}
+            <View style={styles.identityRow}>
+              {/*
+               * Avatar: shows user photo if uploaded.
+               * No photo → Avatar component automatically renders name initials
+               * (e.g. "P" for Pankaj) in a colored circle — no blank space.
+               */}
+              <Avatar name={userName} uri={avatarUrl} size={72} />
 
-            {/* Avatar overlapping cover / body seam */}
-            <View style={styles.avatarAnchor}>
-              <View style={[styles.avatarRing, { borderColor: colors.surfaceContainerLowest }]}>
-                <Avatar name={userName} uri={avatarUrl} size={sizes.avatarXLarge} />
+              <View style={styles.identityText}>
+                <Text
+                  style={[typography.titleLarge, { color: colors.onSurface }]}
+                  numberOfLines={1}
+                >
+                  {userName}
+                </Text>
+                <Text
+                  style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}
+                  numberOfLines={1}
+                >
+                  {userEmail}
+                </Text>
+                {hasRating && (
+                  <StarRating avg={profileData.avgRating} count={profileData.ratingCount} />
+                )}
               </View>
+
+              {/* Compact edit icon button — top-right corner */}
+              <TouchableOpacity
+                style={[styles.editIconBtn, { backgroundColor: colors.primaryContainer }]}
+                onPress={() => navigation.navigate('EditProfile')}
+                activeOpacity={0.7}
+              >
+                <Pencil size={16} color={colors.primary} />
+              </TouchableOpacity>
             </View>
 
-            {/* Name, email, chips, edit button */}
-            <View style={styles.profileBody}>
-              <Text style={[typography.headlineSmall, { color: colors.onSurface }]}>{userName}</Text>
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
-                {userEmail}
-              </Text>
-
-              {hasRating && (
-                <StarRating
-                  avg={profileData.avgRating}
-                  count={profileData.ratingCount}
-                  colors={colors}
-                  typography={typography}
-                />
-              )}
-
+            {/* Chip row below the identity row */}
+            {(profileData?.skillLevel || profileData?.state || profileData?.playStyle) && (
               <View style={styles.chipRow}>
                 {profileData?.skillLevel && (
-                  <Badge label={formatSkillLevel(profileData.skillLevel)} variant="primary" size="large" />
+                  <Badge label={formatSkillLevel(profileData.skillLevel)} variant="primary" size="small" />
                 )}
                 {(profileData?.city || profileData?.state) && (
                   <Badge
                     label={profileData.city ? `${profileData.city}, ${profileData.state}` : profileData.state}
                     variant="secondary"
-                    size="large"
-                    style={{ marginLeft: spacing.xs }}
+                    size="small"
                   />
                 )}
                 {profileData?.playStyle && (
-                  <Badge
-                    label={formatPlayStyle(profileData.playStyle)}
-                    variant="tertiary"
-                    size="large"
-                    style={{ marginLeft: spacing.xs }}
-                  />
+                  <Badge label={formatPlayStyle(profileData.playStyle)} variant="tertiary" size="small" />
                 )}
               </View>
-
-              <Button
-                title="Edit Profile"
-                onPress={() => navigation.navigate('EditProfile')}
-                variant="outline"
-                style={{ width: '100%', marginTop: spacing.lg }}
-              />
-            </View>
+            )}
           </Animated.View>
 
-          {/* ─── Real stats ─── */}
+          {/* ─── Real stats ───────────────────────────────────────────── */}
           <View style={styles.statsRow}>
             <AnimatedStat
               value={postCount}
               label="My Posts"
               color={colors.primary}
+              tint={colors.primaryContainer}
               icon={<ClipboardList size={20} color={colors.primary} />}
+              onPress={() => navigation.navigate('My Posts')}
             />
             <AnimatedStat
               value={connectionCount}
               label="Connections"
-              color={colors.success}
-              icon={<Users size={20} color={colors.success} />}
+              color={colors.brandGreen}
+              tint={colors.brandGreenContainer}
+              icon={<Users size={20} color={colors.brandGreen} />}
+              onPress={() => navigation.navigate('Messages')}
             />
           </View>
 
-          {/* ─── Menu blocks ─── */}
+          {/* ─── Menu blocks ──────────────────────────────────────────── */}
           {menuGroups.map((group, gi) => (
             <View
               key={gi}
-              style={[styles.menuBlock, { backgroundColor: colors.surfaceContainerLowest }]}
+              style={[styles.menuBlock, { backgroundColor: colors.surface }]}
             >
               {group.map((item, ii) => (
                 <React.Fragment key={ii}>
@@ -418,9 +412,7 @@ export default function ProfileScreen({ navigation }: any) {
                     <View style={[styles.menuIconCircle, { backgroundColor: item.iconBg }]}>
                       {item.icon}
                     </View>
-                    <Text
-                      style={[typography.bodyLarge, { color: colors.onSurface, flex: 1, fontWeight: '500' }]}
-                    >
+                    <Text style={[typography.bodyLarge, { color: colors.onSurface, flex: 1, fontWeight: '500' }]}>
                       {item.label}
                     </Text>
                     {item.badge != null && (
@@ -448,28 +440,25 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
           ))}
 
-          {/* ─── Log out / Delete ─── */}
+          {/* ─── Log out / Delete ─────────────────────────────────────── */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionBtn, { borderColor: colors.outline }]}
               onPress={handleLogout}
               activeOpacity={0.7}
             >
-              <LogOut size={18} color={colors.primary} />
+              <LogOut size={17} color={colors.primary} />
               <Text style={[typography.labelLarge, { color: colors.primary, marginLeft: spacing.sm }]}>
                 Log Out
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                { borderColor: colors.errorContainer, backgroundColor: colors.errorContainer },
-              ]}
+              style={[styles.actionBtn, { borderColor: colors.errorContainer, backgroundColor: colors.errorContainer }]}
               onPress={handleDeleteAccount}
               activeOpacity={0.7}
             >
-              <Trash2 size={18} color={colors.error} />
+              <Trash2 size={17} color={colors.error} />
               <Text style={[typography.labelLarge, { color: colors.error, marginLeft: spacing.sm }]}>
                 Delete
               </Text>
@@ -479,7 +468,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Text
             style={[
               typography.labelSmall,
-              { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.massive },
+              { color: colors.onSurfaceVariant, textAlign: 'center', marginBottom: spacing.massive },
             ]}
           >
             Senior Pickleball Partners v1.0.0
@@ -491,88 +480,48 @@ export default function ProfileScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scroll: {
-    paddingBottom: spacing.massive,
-  },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scroll: { paddingBottom: spacing.massive },
 
   // ─── Profile card
   profileCard: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
-    borderRadius: borderRadius.xxl,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
     marginBottom: spacing.lg,
+    borderRadius: borderRadius.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
   },
-
-  // Cover band
-  coverBand: {
-    height: 130,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  courtHorizLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 65,
-    borderTopWidth: 1.5,
-  },
-  courtVertLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    borderLeftWidth: 1.5,
-  },
-  courtCircle: {
-    position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 1.5,
-    top: 65 - 45,
-    left: '50%',
-    marginLeft: -45,
-  },
-
-  // Avatar overlapping seam
-  avatarAnchor: {
-    alignItems: 'center',
-    marginTop: -52,
-    zIndex: 10,
-  },
-  avatarRing: {
-    borderWidth: 4,
-    borderRadius: 999,
-    padding: 3,
-  },
-
-  // Body below avatar
-  profileBody: {
+  identityRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.md,
+  },
+  identityText: {
+    flex: 1,
+  },
+  editIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
 
-  // Stats row
+  // ─── Stats
   statsRow: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
@@ -580,12 +529,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  // Menu block
+  // ─── Menu
   menuBlock: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
     borderRadius: borderRadius.xl,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -616,16 +564,16 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   innerDivider: {
-    height: 1,
-    marginRight: 0,
+    height: StyleSheet.hairlineWidth,
+    marginRight: spacing.lg,
   },
 
-  // Action row
+  // ─── Action row
   actionRow: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
     gap: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     marginBottom: spacing.lg,
   },
   actionBtn: {

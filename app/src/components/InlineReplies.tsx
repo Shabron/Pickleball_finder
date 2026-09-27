@@ -7,7 +7,7 @@
  * - Inline compose bar — requires auth to post (graceful alert if not)
  * - Optimistic append on submit
  */
-import React, { useState, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -68,6 +68,11 @@ const InlineReplies = forwardRef<InlineRepliesHandle, InlineRepliesProps>(functi
   const [count, setCount] = useState(initialCount);
 
   const inputRef = useRef<TextInput>(null);
+
+  // Keep the badge in sync when the feed refreshes (until replies are loaded locally)
+  useEffect(() => {
+    if (!fetched) setCount(initialCount);
+  }, [initialCount, fetched]);
 
   // Fetch once on first expand
   const fetchReplies = useCallback(async () => {
@@ -144,7 +149,8 @@ const InlineReplies = forwardRef<InlineRepliesHandle, InlineRepliesProps>(functi
 
   return (
     <View style={styles.wrapper}>
-      {/* ── Toggle row ── */}
+      {/* ── Toggle row (only when there is something to show) ── */}
+      {(count > 0 || expanded) && (
       <TouchableOpacity
         style={styles.toggleRow}
         onPress={handleToggle}
@@ -161,6 +167,7 @@ const InlineReplies = forwardRef<InlineRepliesHandle, InlineRepliesProps>(functi
             : <ChevronDown size={14} color={colors.primary} style={{ marginLeft: 3 }} />
         )}
       </TouchableOpacity>
+      )}
 
       {/* ── Expanded section ── */}
       {expanded && (

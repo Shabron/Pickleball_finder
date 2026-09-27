@@ -1,122 +1,233 @@
 /**
- * HomeScreen — Partner Posts feed
+ * HomeScreen — Partner Posts feed (v2)
  *
  * Not bound to a single state: shows every open post, nearest-first by real
  * distance from the signed-in user's profile location. Posts without a
  * resolvable distance (or before a location is known) fall back to
  * newest-first so nothing silently disappears.
+ *
+ * v2:
+ *  - Personal greeting instead of a static title
+ *  - Skeleton cards on FIRST load only; returning to the tab refreshes
+ *    silently in the background (no more blank-screen spinner = no lag feel)
+ *  - Pull-to-refresh
+ *  - Friendly empty + error states with a call to action
+ *  - FAB collapses to an icon while scrolling down, expands on scroll up
  */
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Alert,
+  RefreshControl,
+  Animated,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutAnimation,
+  TouchableOpacity,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { postApi, messageApi, profileApi, getAvatarUrl } from '../../services/api';
 import { ensurePushRegistration } from '../../services/push';
-import { Plus } from 'lucide-react-native';
+import { useAuth } from '../../context/AuthContext';
+import { Plus, Users, WifiOff } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
-import PartnerPostCard, { PartnerPostData } from '../../components/PartnerPostCard';
+import PartnerPostCard from '../../components/PartnerPostCard';
 import FAB from '../../components/common/FAB';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, borderRadius } from '../../theme/spacing';
 
 const formatTimeAgo = (dateString: string) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 };
 
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+// ─── Skeleton card (pulsing placeholder) ─────────────────────────────────────
+function SkeletonCard({ pulse }: { pulse: Animated.Value }) {
+  const { colors } = useTheme();
+  const block = (w: number | string, h: number, extra: object = {}) => (
+    <View style={[{ width: w as any, height: h, borderRadius: 6, backgroundColor: colors.surfaceContainer }, extra]} />
+  );
+  return (
+    <Animated.View style={[styles.skeleton, { backgroundColor: colors.surface, opacity: pulse }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceContainer }} />
+        <View style={{ marginLeft: spacing.md, flex: 1 }}>
+          {block('45%', 14)}
+          {block('30%', 12, { marginTop: 8 })}
+        </View>
+      </View>
+      {block('90%', 14, { marginTop: spacing.lg })}
+      {block('70%', 14, { marginTop: 8 })}
+      {block('40%', 12, { marginTop: spacing.md })}
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen({ navigation }: any) {
+  const { colors, typography } = useTheme();
+  const { user } = useAuth();
+
   const [posts, setPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+  const [fabExtended, setFabExtended] = useState(true);
 
-  // Ask for notification permission here — once the user has actually reached the
-  // dashboard — rather than interrupting the signup flow with an OS dialog.
+  const coordsRef = useRef<{ lat?: number; lng?: number }>({});
+  const lastOffset = useRef(0);
+  const pulse = useRef(new Animated.Value(0.5)).current;
+
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
+
+  // Ask for notification permission once the user has reached the dashboard
   useEffect(() => {
     ensurePushRegistration();
   }, []);
 
-  // Fetch profile (unread count + location), saved post ids, and the
-  // nearest-first post feed whenever Home is focused.
+  // Skeleton pulse
+  useEffect(() => {
+    if (!initialLoading) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.5, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [initialLoading, pulse]);
+
+  const loadFeed = useCallback(async () => {
+    try {
+      // Profile (for location + unread) and saved ids in parallel
+      const [profileRes, savedRes] = await Promise.allSettled([
+        profileApi.getProfile(),
+        postApi.getSavedPosts(),
+      ]);
+
+      if (profileRes.status === 'fulfilled' && profileRes.value?.success) {
+        setUnreadCount(profileRes.value.unreadNotificationsCount || 0);
+        const c = profileRes.value.data?.location?.coordinates;
+        // GeoJSON is [longitude, latitude]
+        if (Array.isArray(c) && c.length === 2) coordsRef.current = { lat: c[1], lng: c[0] };
+      }
+      if (savedRes.status === 'fulfilled' && savedRes.value?.success) {
+        setSavedPostIds(new Set(savedRes.value.data.posts.map((p: any) => p._id)));
+      }
+
+      const res = await postApi.getPosts({ status: 'Open', ...coordsRef.current });
+      setPosts(res.data.posts);
+      setError(false);
+    } catch (err) {
+      console.error('Failed to load feed:', err);
+      setError(true);
+    } finally {
+      setInitialLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Refresh on focus — silently (existing list stays visible)
   useFocusEffect(
-    React.useCallback(() => {
-      const fetchPosts = async (params: { lat?: number; lng?: number }) => {
-        setLoading(true);
-        try {
-          const res = await postApi.getPosts({ status: 'Open', ...params });
-          setPosts(res.data.posts);
-        } catch (error) {
-          console.error('Failed to fetch posts:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const fetchProfileAndPosts = async () => {
-        try {
-          const res = await profileApi.getProfile();
-          if (res.success) {
-            setUnreadCount(res.unreadNotificationsCount || 0);
-            const coords = res.data?.location?.coordinates;
-            if (Array.isArray(coords) && coords.length === 2) {
-              // GeoJSON stores coordinates as [longitude, latitude]
-              await fetchPosts({ lat: coords[1], lng: coords[0] });
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch profile:', error);
-        }
-        await fetchPosts({});
-      };
-
-      const fetchSavedPostIds = async () => {
-        try {
-          const res = await postApi.getSavedPosts();
-          if (res.success) {
-            setSavedPostIds(new Set(res.data.posts.map((p: any) => p._id)));
-          }
-        } catch (error) {
-          console.error('Failed to fetch saved posts:', error);
-        }
-      };
-
-      fetchProfileAndPosts();
-      fetchSavedPostIds();
-    }, [])
+    useCallback(() => {
+      loadFeed();
+    }, [loadFeed])
   );
 
-  const { colors, typography } = useTheme();
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadFeed();
+  };
 
   const handleMessage = async (authorId: string, authorName: string) => {
     try {
-      const res = await messageApi.sendMessage(
-        authorId,
-        "Hi! I saw your post on Senior Pickleball Partners."
-      );
+      const res = await messageApi.sendMessage(authorId, 'Hi! I saw your post on Senior Pickleball Partners.');
       if (res.success) {
-        navigation.navigate('ChatThread', {
-          conversationId: res.conversationId,
-          userId: authorId,
-          name: authorName,
-        });
+        navigation.navigate('ChatThread', { conversationId: res.conversationId, userId: authorId, name: authorName });
       } else {
-        Alert.alert('Failed to send message: ' + res.message);
+        Alert.alert('Could not send message', res.message);
       }
-    } catch (error: any) {
-      console.error('Failed to message:', error);
-      Alert.alert('Failed to message: ' + error.message);
+    } catch (err: any) {
+      Alert.alert('Could not send message', err.message);
     }
   };
 
+  // Collapse FAB label while scrolling down, expand when scrolling up / near top
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const goingDown = y > lastOffset.current + 4;
+    const goingUp = y < lastOffset.current - 4;
+    lastOffset.current = y;
+    const shouldExtend = y < 40 || goingUp ? true : goingDown ? false : fabExtended;
+    if (shouldExtend !== fabExtended) {
+      LayoutAnimation.configureNext(LayoutAnimation.create(180, 'easeInEaseOut', 'opacity'));
+      setFabExtended(shouldExtend);
+    }
+  };
 
+  const nearbyCount = posts.length;
+
+  const ListHeader = (
+    <View style={styles.intro}>
+      <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '700' }]}>
+        {greeting()}{firstName ? `, ${firstName}` : ''} 👋
+      </Text>
+      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+        {initialLoading
+          ? 'Finding players near you…'
+          : nearbyCount > 0
+            ? `${nearbyCount} ${nearbyCount === 1 ? 'player is' : 'players are'} looking for a partner`
+            : 'No open posts right now'}
+      </Text>
+      {!initialLoading && nearbyCount > 0 && (
+        <Text style={[typography.labelLarge, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
+          NEAREST FIRST
+        </Text>
+      )}
+    </View>
+  );
+
+  const EmptyState = (
+    <View style={[styles.empty, { backgroundColor: colors.surface }]}>
+      <View style={[styles.emptyIcon, { backgroundColor: error ? colors.errorContainer : colors.primaryContainer }]}>
+        {error ? <WifiOff size={28} color={colors.error} /> : <Users size={28} color={colors.primary} />}
+      </View>
+      <Text style={[typography.titleMedium, { color: colors.onSurface, marginTop: spacing.md, textAlign: 'center' }]}>
+        {error ? "Couldn't load posts" : 'Be the first to post today'}
+      </Text>
+      <Text
+        style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xs, textAlign: 'center' }]}
+      >
+        {error
+          ? 'Our server may be waking up — this can take up to a minute.'
+          : 'Let nearby players know when and where you want to play.'}
+      </Text>
+      <TouchableOpacity
+        style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+        onPress={error ? onRefresh : () => navigation.navigate('CreatePost')}
+        activeOpacity={0.8}
+      >
+        <Text style={[typography.labelLarge, { color: colors.onPrimary }]}>{error ? 'Try again' : 'Create a post'}</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <ScreenWrapper>
@@ -125,26 +236,14 @@ export default function HomeScreen({ navigation }: any) {
         showNotificationBell
         notificationCount={unreadCount}
         onNotificationPress={() => navigation.navigate('Notifications')}
-        style={{ backgroundColor: 'transparent' }}
       />
 
-
-      {/* ─── Post List ─── */}
-      <View style={styles.listHeader}>
-        <Text style={[typography.titleLarge, { color: colors.onSurface }]}>
-          Partner Posts
-        </Text>
-        <View style={[styles.activeBadge, { backgroundColor: colors.brandGreenContainer }]}>
-          <View style={[styles.activeDot, { backgroundColor: colors.brandGreen }]} />
-          <Text style={[typography.labelMedium, { color: colors.onBrandGreenContainer, fontWeight: '600' }]}>
-            {posts.length} active posts
-          </Text>
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+      {initialLoading ? (
+        <View style={styles.listContainer}>
+          {ListHeader}
+          <SkeletonCard pulse={pulse} />
+          <SkeletonCard pulse={pulse} />
+          <SkeletonCard pulse={pulse} />
         </View>
       ) : (
         <FlatList
@@ -152,19 +251,34 @@ export default function HomeScreen({ navigation }: any) {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={EmptyState}
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+          initialNumToRender={4}
+          windowSize={7}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <PartnerPostCard
               post={{
                 id: item._id,
-                name: item.author.name,
-                level: item.skillLevel || 'Unknown',
+                name: item.author?.name || 'Player',
+                level: item.skillLevel || '',
                 timeAgo: formatTimeAgo(item.createdAt),
                 content: item.description,
                 playStyle: item.playStyle,
-                location: `${item.city ? item.city + ', ' : ''}${item.state}${
-                  item.distanceKm != null ? ` · ${(item.distanceKm * 0.621371).toFixed(1)} mi away` : ''
-                }`,
+                location: `${item.city ? item.city + ', ' : ''}${item.state}`,
+                distance: item.distanceKm != null ? `${(item.distanceKm * 0.621371).toFixed(1)} mi` : undefined,
                 avatarUri: getAvatarUrl(item.author?.avatar),
+                replyCount: item.replyCount,
+                isOwn: !!user?._id && item.author?._id === user._id,
               }}
               initialSaved={savedPostIds.has(item._id)}
               onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
@@ -176,45 +290,50 @@ export default function HomeScreen({ navigation }: any) {
 
       <FAB
         icon={<Plus color={colors.onPrimary} size={22} strokeWidth={2.5} />}
-        label="New Post"
+        label={fabExtended ? 'New Post' : undefined}
         onPress={() => navigation.navigate('CreatePost')}
+        style={{ bottom: spacing.lg, right: spacing.lg }}
       />
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  heroLogoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    marginTop: spacing.md,
-  },
-  heroLogo: {
-    width: 280,
-    height: 160,
-  },
-  listHeader: {
+  listContainer: {
     paddingHorizontal: spacing.lg,
+    paddingBottom: 110, // clear the FAB
+  },
+  intro: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  sectionLabel: {
     marginTop: spacing.lg,
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  skeleton: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     marginBottom: spacing.md,
   },
-  activeBadge: {
-    flexDirection: 'row',
+  empty: {
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xxl,
+    marginTop: spacing.sm,
   },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  listContainer: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: 100,
+  emptyBtn: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: borderRadius.full,
   },
 });

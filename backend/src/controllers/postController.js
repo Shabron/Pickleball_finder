@@ -88,6 +88,16 @@ const getPosts = async (req, res) => {
     }
     await attachAuthorAvatars(posts);
 
+    // Reply counts for this page in a single grouped query (no N+1).
+    if (posts.length) {
+      const counts = await Reply.aggregate([
+        { $match: { post: { $in: posts.map((p) => p._id) } } },
+        { $group: { _id: '$post', n: { $sum: 1 } } },
+      ]);
+      const byId = new Map(counts.map((c) => [String(c._id), c.n]));
+      posts.forEach((p) => { p.replyCount = byId.get(String(p._id)) || 0; });
+    }
+
     return res.status(200).json({
       success: true,
       data: {
