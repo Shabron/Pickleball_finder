@@ -117,7 +117,13 @@ export default function ReportBlockSheet({ visible, userId, userName, context, o
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
       </Animated.View>
 
-      <Animated.View style={[styles.sheet, { backgroundColor: colors.surface, transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          { backgroundColor: colors.surface, transform: [{ translateY: slideAnim }] },
+          mode === 'menu' ? { height: undefined, maxHeight: SHEET_HEIGHT } : null,
+        ]}
+      >
         <View style={[styles.handle, { backgroundColor: colors.outline }]} />
 
         <View style={[styles.sheetHeader, { borderBottomColor: colors.outlineVariant }]}>
@@ -318,7 +324,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
   },
   reasonRow: {
     flexDirection: 'row',

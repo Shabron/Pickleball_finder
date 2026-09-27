@@ -3,6 +3,7 @@ const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 const { computeMatchScore } = require('../utils/matchScore');
 const { geocodeApprox } = require('../utils/geocode');
+const { viewStatus } = require('../utils/connectionStatus');
 
 const ZIP_REGEX = /^\d{5}$/;
 
@@ -137,18 +138,14 @@ const getNearbyPlayers = async (req, res) => {
 
     // Create a map of userId -> connectionStatus
     const statusMap = {};
+    const convMap = {};
     conversations.forEach(conv => {
       const otherParticipant = conv.participants.find(p => p.toString() !== req.user._id.toString());
-      if (otherParticipant) {
-        if (conv.status === 'accepted') {
-          statusMap[otherParticipant.toString()] = 'accepted';
-        } else if (conv.status === 'pending') {
-          statusMap[otherParticipant.toString()] =
-            (conv.initiator && conv.initiator.toString() === req.user._id.toString())
-            ? 'pending_sent'
-            : 'pending_received';
-        }
-      }
+      if (!otherParticipant) return;
+      const status = viewStatus(conv, req.user._id);
+      if (status === 'none') return;
+      statusMap[otherParticipant.toString()] = status;
+      convMap[otherParticipant.toString()] = conv._id;
     });
 
     return res.status(200).json({
@@ -160,7 +157,7 @@ const getNearbyPlayers = async (req, res) => {
           distanceKm,
           matchScore: computeMatchScore(myProfile, p, distanceKm),
           connectionStatus: statusMap[p.user._id.toString()] || 'none',
-          conversationId: conversations.find(c => c.participants.some(par => par.toString() === p.user._id.toString()))?._id || null,
+          conversationId: convMap[p.user._id.toString()] || null,
         };
       }),
       hasMore,

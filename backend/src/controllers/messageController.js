@@ -5,6 +5,7 @@ const Profile = require('../models/Profile');
 const User = require('../models/User');
 const { sendPushNotification } = require('../utils/push');
 const { attachAvatarsToUsers } = require('../utils/attachAvatars');
+const { viewStatus, isInCooldown } = require('../utils/connectionStatus');
 
 // @desc    Get all conversations for the logged-in user
 // @route   GET /api/messages/conversations
@@ -14,28 +15,60 @@ const getConversations = async (req, res) => {
     const userId = req.user._id;
 
     // Find conversations where user is a participant
-    const conversations = await Conversation.find({ participants: userId })
+    const all = await Conversation.find({ participants: userId })
       .populate('participants', 'name email profileComplete')
       .populate('lastMessage')
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
 
-    const conversationsWithUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        const unreadCount = await Message.countDocuments({
-          conversationId: conv._id,
-          senderId: { $ne: userId },
-          isRead: false,
-        });
-        return {
-          ...conv.toObject(),
-          unreadCount,
-        };
-      })
-    );
+    // Hide declined/withdrawn threads (the sender keeps seeing "waiting"
+    // during the cool-down — see utils/connectionStatus).
+    const conversations = all
+      .map((c) => ({ ...c, viewStatus: viewStatus(c, userId) }))
+      .filter((c) => c.viewStatus !== 'none');
+
+    // Unread counts for every conversation in one aggregate (was N queries).
+    const unreadRows = conversations.length
+      ? await Message.aggregate([
+          {
+            $match: {
+              conversationId: { $in: conversations.map((c) => c._id) },
+              senderId: { $ne: userId },
+              isRead: false,
+            },
+          },
+          { $group: { _id: '$conversationId', n: { $sum: 1 } } },
+        ])
+      : [];
+    const unreadBy = new Map(unreadRows.map((r) => [r._id.toString(), r.n]));
+
+    const conversationsWithUnread = conversations.map((c) => ({
+      ...c,
+      unreadCount: unreadBy.get(c._id.toString()) || 0,
+    }));
 
     // Batch-attach avatars (from Profile) to every participant across all
     // conversations in one query, rather than one lookup per conversation.
-    await attachAvatarsToUsers(conversationsWithUnread.flatMap((c) => c.participants));
+    const everyone = conversationsWithUnread.flatMap((c) => c.participants);
+    await attachAvatarsToUsers(everyone);
+
+    // Level + city so request rows can say who the person is.
+    const others = everyone.filter((u) => u && u._id.toString() !== userId.toString());
+    if (others.length) {
+      const profs = await Profile.find(
+        { user: { $in: others.map((u) => u._id) } },
+        'user skillLevel city state'
+      ).lean();
+      const byUser = new Map(profs.map((p) => [p.user.toString(), p]));
+      others.forEach((u) => {
+        const pr = byUser.get(u._id.toString());
+        if (pr) {
+          u.skillLevel = pr.skillLevel;
+          u.city = pr.city;
+          u.state = pr.state;
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -69,11 +102,13 @@ const getMessages = async (req, res) => {
       .populate('senderId', 'name')
       .sort({ createdAt: 1 }); // Oldest first for chat history
 
+    const status = viewStatus(conversation, userId);
     res.status(200).json({
       success: true,
-      data: messages,
+      data: status === 'none' ? [] : messages,
       conversationStatus: conversation.status,
       initiator: conversation.initiator,
+      viewStatus: status,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -114,11 +149,22 @@ const sendMessage = async (req, res) => {
         initiator: senderId,
       });
       isNewRequest = true;
-    } else {
-      // Prevent the receiver from sending messages before accepting
-      if (conversation.status === 'pending' && senderId.toString() !== conversation.initiator.toString()) {
-        return res.status(403).json({ success: false, message: 'Please accept the request to send messages' });
+    } else if (conversation.status === 'rejected') {
+      const senderStarted = conversation.initiator && conversation.initiator.toString() === senderId.toString();
+      if (senderStarted && isInCooldown(conversation)) {
+        // Silently declined: behave as if the request is still waiting.
+        return res.status(201).json({ success: true, data: null, conversationId: conversation._id });
       }
+      // Cool-down over (or the decliner reaches out) — start a fresh request.
+      await Message.deleteMany({ conversationId: conversation._id });
+      conversation.status = 'pending';
+      conversation.initiator = senderId;
+      conversation.declinedAt = undefined;
+      conversation.initiatorHidden = false;
+      isNewRequest = true;
+    } else if (conversation.status === 'pending' && senderId.toString() !== conversation.initiator.toString()) {
+      // Prevent the receiver from sending messages before accepting
+      return res.status(403).json({ success: false, message: 'Please accept the request to send messages' });
     }
 
     // Create the new message
@@ -276,4 +322,68 @@ const acceptRequest = async (req, res) => {
   }
 };
 
-module.exports = { getConversations, getMessages, sendMessage, markMessagesAsRead, acceptRequest };
+// @desc    Decline a connection request (the sender is NOT notified)
+// @route   PUT /api/messages/:conversationId/decline
+// @access  Private
+const declineRequest = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const conversation = await Conversation.findById(req.params.conversationId);
+    if (!conversation || !conversation.participants.some((p) => p.toString() === userId.toString())) {
+      return res.status(404).json({ success: false, message: 'Conversation not found or not authorized' });
+    }
+    if (conversation.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Conversation is not pending' });
+    }
+    if (conversation.initiator && conversation.initiator.toString() === userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Use cancel for your own request' });
+    }
+    conversation.status = 'rejected';
+    conversation.declinedAt = new Date();
+    await conversation.save();
+    await Notification.deleteMany({ recipient: userId, referenceId: conversation._id, type: 'request_sent' });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Cancel (withdraw) a request I sent
+// @route   DELETE /api/messages/:conversationId
+// @access  Private
+const cancelRequest = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const conversation = await Conversation.findById(req.params.conversationId);
+    if (!conversation || !conversation.initiator || conversation.initiator.toString() !== userId.toString()) {
+      return res.status(404).json({ success: false, message: 'Request not found' });
+    }
+    if (conversation.status === 'accepted') {
+      return res.status(400).json({ success: false, message: 'Request was already accepted' });
+    }
+    if (conversation.status === 'rejected') {
+      // Keep the record so the 30-day cool-down still applies.
+      conversation.initiatorHidden = true;
+      await conversation.save();
+    } else {
+      await Promise.all([
+        Message.deleteMany({ conversationId: conversation._id }),
+        Notification.deleteMany({ referenceId: conversation._id, type: 'request_sent' }),
+        Conversation.deleteOne({ _id: conversation._id }),
+      ]);
+    }
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  getConversations,
+  getMessages,
+  sendMessage,
+  markMessagesAsRead,
+  acceptRequest,
+  declineRequest,
+  cancelRequest,
+};

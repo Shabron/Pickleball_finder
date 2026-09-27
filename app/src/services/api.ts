@@ -781,6 +781,36 @@ export const messageApi = {
       throw error;
     }
   },
+
+  /** Decline a request someone sent me. The sender is not notified. */
+  declineRequest: async (conversationId: string) => {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}/messages/${conversationId}/decline`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || 'Failed to decline request');
+    return body;
+  },
+
+  /** Withdraw a request I sent. */
+  cancelRequest: async (conversationId: string) => {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE_URL}/messages/${conversationId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || 'Failed to cancel request');
+    return body;
+  },
 };
 
 // ─── NOTIFICATION API ─────────────────────────────────────────────────────────────

@@ -22,6 +22,15 @@ const conversationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    declinedAt: {
+      type: Date,
+    },
+    // Initiator removed a request that was silently declined. Kept (not
+    // deleted) so the 30-day cool-down still applies.
+    initiatorHidden: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

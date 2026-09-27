@@ -6,6 +6,7 @@ const Post = require('../models/Post');
 const { geocodeApprox } = require('../utils/geocode');
 const { computeMatchScore, haversineKm } = require('../utils/matchScore');
 const zipcodes = require('zipcodes');
+const { viewStatus } = require('../utils/connectionStatus');
 
 // @desc    Get my profile
 // @route   GET /api/profile/me
@@ -184,16 +185,8 @@ const getProfileByUserId = async (req, res) => {
         participants: { $all: [req.user._id, req.params.userId] },
       });
 
-      if (conv) {
-        conversationId = conv._id;
-        if (conv.status === 'accepted') {
-          connectionStatus = 'accepted';
-        } else if (conv.status === 'pending') {
-          connectionStatus = (conv.initiator && conv.initiator.toString() === req.user._id.toString())
-            ? 'pending_sent'
-            : 'pending_received';
-        }
-      }
+      connectionStatus = viewStatus(conv, req.user._id);
+      if (conv && connectionStatus !== 'none') conversationId = conv._id;
 
       const myProfile = await Profile.findOne({ user: req.user._id }, 'skillLevel playStyle location');
       const km = haversineKm(myProfile?.location?.coordinates, profile.location?.coordinates);
