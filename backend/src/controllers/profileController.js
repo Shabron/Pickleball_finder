@@ -2,6 +2,7 @@ const Profile = require('../models/Profile');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Notification = require('../models/Notification');
+const Post = require('../models/Post');
 const { geocodeApprox } = require('../utils/geocode');
 const { computeMatchScore, haversineKm } = require('../utils/matchScore');
 const zipcodes = require('zipcodes');
@@ -17,15 +18,21 @@ const getMyProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Profile not found. Please create your profile.' });
     }
 
-    const unreadNotificationsCount = await Notification.countDocuments({
-      recipient: req.user._id,
-      read: false,
-    });
+    const [unreadNotificationsCount, postCount, connectionCount] = await Promise.all([
+      Notification.countDocuments({ recipient: req.user._id, read: false }),
+      Post.countDocuments({ author: req.user._id }),
+      Conversation.countDocuments({
+        participants: req.user._id,
+        status: 'accepted',
+      }),
+    ]);
 
     res.status(200).json({ 
       success: true, 
       data: profile,
-      unreadNotificationsCount
+      unreadNotificationsCount,
+      postCount,
+      connectionCount,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
