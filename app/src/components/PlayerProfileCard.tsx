@@ -1,22 +1,16 @@
 /**
- * PlayerProfileCard — Compact player row for the Matchmaking feed
+ * PlayerProfileCard — compact player row (v2)
  *
- * Sized so at least 3 cards are visible on screen at once (no more than
- * ~150px tall), rather than the old near-full-screen card. Full details
- * (bio, etc.) live on the "View Profile" screen instead of here.
+ *  - Whole card opens the profile (no separate "View Profile" button)
+ *  - One context-aware action: Connect / Requested / Accept / Message
+ *  - Match % replaced by a plain-language reason ("Same level", …)
+ *  - White card, shadow only; press feedback via scale
  */
-import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  ViewStyle,
-} from 'react-native';
-import { MapPin, CircleCheck, Zap, Star } from 'lucide-react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, ViewStyle } from 'react-native';
+import { MapPin, CircleCheck, Star, Sparkles } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { spacing, borderRadius, sizes } from '../theme/spacing';
+import { spacing, borderRadius } from '../theme/spacing';
 import { getSkillLevelLabel } from '../constants/skillLevels';
 import Avatar from './common/Avatar';
 
@@ -24,9 +18,10 @@ export interface PlayerProfileData {
   id: string;
   name: string;
   level: string;
-  /** GPS distance label (e.g. "1.2 mi"), only meaningful in Nearby search mode */
+  /** GPS distance label (e.g. "1.2 mi"), or 'Unknown' */
   distance: string;
-  /** City/state, used as the location line when there's no GPS distance (state/zip search) */
+  /** Raw distance in miles, for sectioning/sorting */
+  distanceMi?: number;
   city?: string;
   state?: string;
   avatarUri?: string;
@@ -35,261 +30,198 @@ export interface PlayerProfileData {
   age?: number;
   connectionStatus?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
   conversationId?: string;
-  /** Approximate location, when known, for plotting on the nearby-players map */
   coordinate?: { latitude: number; longitude: number };
   avgRating?: number;
   ratingCount?: number;
   emailVerified?: boolean;
 }
 
-interface PlayerProfileCardProps {
+interface Props {
   player: PlayerProfileData;
+  /** Signed-in user's own profile, used to explain why this is a good match */
+  me?: { skillLevel?: string; playStyle?: string };
   onConnect?: () => void;
   onViewProfile?: () => void;
   style?: ViewStyle;
 }
 
-export default function PlayerProfileCard({
-  player,
-  onConnect,
-  onViewProfile,
-  style,
-}: PlayerProfileCardProps) {
+const SKILL_ORDER: Record<string, number> = {
+  beginner: 0, lowIntermediate: 1, highIntermediate: 2, advanced: 3, professional: 4,
+};
+const STYLE_LABELS: Record<string, string> = {
+  singles: 'Singles', doubles: 'Doubles', mixed: 'Mixed', any: 'Any style',
+};
+
+/** One short, honest reason — or null when nothing stands out. */
+function matchReason(player: PlayerProfileData, me?: Props['me']): string | null {
+  const a = SKILL_ORDER[me?.skillLevel ?? ''];
+  const b = SKILL_ORDER[player.level];
+  if (a != null && b != null) {
+    if (a === b) return 'Same level as you';
+    if (Math.abs(a - b) === 1) return 'Close to your level';
+  }
+  const mine = me?.playStyle;
+  const theirs = player.playStyle?.toLowerCase();
+  if (mine && theirs && mine !== 'any' && mine === theirs) {
+    return `Also plays ${STYLE_LABELS[theirs]?.toLowerCase() ?? theirs}`;
+  }
+  if (player.distanceMi != null && player.distanceMi <= 3) return 'Lives close by';
+  return null;
+}
+
+export default function PlayerProfileCard({ player, me, onConnect, onViewProfile, style }: Props) {
   const { colors, typography } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
 
-  // Entrance animation
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(16)).current;
+  const skillTone: Record<string, { bg: string; fg: string }> = {
+    beginner: { bg: colors.brandGreenContainer, fg: colors.onBrandGreenContainer },
+    lowIntermediate: { bg: colors.secondaryContainer, fg: colors.onSecondaryContainer },
+    highIntermediate: { bg: colors.primaryContainer, fg: colors.onPrimaryContainer },
+    advanced: { bg: colors.tertiaryContainer, fg: colors.onTertiaryContainer },
+    professional: { bg: colors.errorContainer, fg: colors.onErrorContainer },
+  };
+  const tone = skillTone[player.level] || { bg: colors.surfaceContainer, fg: colors.onSurfaceVariant };
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 350,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 60,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const primaryPlayStyle = player.playStyle ? player.playStyle.split('/')[0].trim() : null;
-
+  const playStyleLabel = player.playStyle ? STYLE_LABELS[player.playStyle.toLowerCase()] : undefined;
   const cityState = [player.city, player.state].filter(Boolean).join(', ');
-  const locationLabel =
-    player.distance && player.distance !== 'Unknown'
-      ? `${player.distance} away`
-      : cityState || null;
+  const hasDistance = !!player.distance && player.distance !== 'Unknown';
+  const reason = matchReason(player, me);
 
-  const scoreColor =
-    (player.matchScore ?? 0) >= 85
-      ? colors.success
-      : (player.matchScore ?? 0) >= 70
-      ? colors.secondary
-      : colors.tertiary;
+  const status = player.connectionStatus || 'none';
+  const cta =
+    status === 'accepted' ? { label: 'Message', filled: true } :
+    status === 'pending_sent' ? { label: 'Requested', filled: false } :
+    status === 'pending_received' ? { label: 'Accept', filled: true } :
+    { label: 'Connect', filled: true };
 
-  const connectLabel =
-    player.connectionStatus === 'accepted' ? 'Message' :
-    player.connectionStatus === 'pending_sent' ? 'Requested' :
-    player.connectionStatus === 'pending_received' ? 'Accept' :
-    'Connect';
+  const pressIn = () =>
+    Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
+  const pressOut = () =>
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
 
   return (
-    <Animated.View
-      style={[
-        styles.cardShadowWrapper,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
-        style,
-      ]}
-    >
-      <View style={[styles.card, { backgroundColor: colors.surface }]}>
-        <View style={[styles.leftAccentBar, { backgroundColor: colors.brandGreen }]} />
+    <Animated.View style={[styles.shadowWrap, { transform: [{ scale }] }, style]}>
+      <Pressable
+        onPress={onViewProfile}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        style={[styles.card, { backgroundColor: colors.surface }]}
+      >
+        <Avatar name={player.name} uri={player.avatarUri} size={52} />
 
-        <View style={styles.topRow}>
-          <TouchableOpacity onPress={onViewProfile} activeOpacity={0.8}>
-            <Avatar name={player.name} uri={player.avatarUri} size={sizes.avatarLarge} />
-          </TouchableOpacity>
-
-          <View style={styles.infoCol}>
-            <View style={styles.nameRow}>
-              <Text
-                style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800' }]}
-                numberOfLines={1}
-              >
-                {player.name}{player.age ? `, ${player.age}` : ''}
-              </Text>
-              {player.emailVerified && (
-                <CircleCheck size={16} color={colors.secondary} style={{ marginLeft: 4 }} />
-              )}
-            </View>
-
-            <View style={styles.metaRow}>
-              <View style={[styles.levelChip, { backgroundColor: colors.primaryContainer }]}>
-                <Text style={[typography.labelSmall, { color: colors.onPrimaryContainer, fontWeight: '700' }]}>
-                  🏓 {getSkillLevelLabel(player.level)}
+        <View style={styles.info}>
+          <View style={styles.nameRow}>
+            <Text style={[typography.titleSmall, { color: colors.onSurface, flexShrink: 1 }]} numberOfLines={1}>
+              {player.name.trim()}
+            </Text>
+            {player.emailVerified && <CircleCheck size={14} color={colors.secondary} style={{ marginLeft: 4 }} />}
+            {!!player.ratingCount && (
+              <View style={styles.rating}>
+                <Star size={11} color={colors.tertiary} fill={colors.tertiary} />
+                <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: 2 }]}>
+                  {player.avgRating?.toFixed(1)}
                 </Text>
-              </View>
-              {!!player.ratingCount && (
-                <View style={styles.ratingInline}>
-                  <Star size={12} color={colors.tertiary} fill={colors.tertiary} />
-                  <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: 2 }]}>
-                    {player.avgRating?.toFixed(1)}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {(locationLabel || primaryPlayStyle) && (
-              <View style={styles.metaRow}>
-                {locationLabel && (
-                  <>
-                    <MapPin size={13} color={colors.onSurfaceVariant} />
-                    <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: 3 }]} numberOfLines={1}>
-                      {locationLabel}
-                    </Text>
-                  </>
-                )}
-                {primaryPlayStyle && (
-                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: locationLabel ? 6 : 0 }]} numberOfLines={1}>
-                    {locationLabel ? `· ${primaryPlayStyle}` : primaryPlayStyle}
-                  </Text>
-                )}
               </View>
             )}
           </View>
 
-          {player.matchScore !== undefined && (
-            <View style={[styles.scoreBadge, { backgroundColor: scoreColor + '22' }]}>
-              <Zap size={11} color={scoreColor} />
-              <Text style={[typography.labelSmall, { color: scoreColor, fontWeight: '700', marginLeft: 2 }]}>
-                {player.matchScore}%
+          <View style={styles.row}>
+            <View style={[styles.chip, { backgroundColor: tone.bg }]}>
+              <Text style={[typography.labelSmall, { color: tone.fg }]} numberOfLines={1}>
+                {getSkillLevelLabel(player.level)}
+              </Text>
+            </View>
+            {playStyleLabel && (
+              <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant, marginLeft: 6 }]} numberOfLines={1}>
+                {playStyleLabel}
+              </Text>
+            )}
+          </View>
+
+          {(hasDistance || !!cityState) && (
+            <View style={styles.row}>
+              <MapPin size={12} color={colors.onSurfaceVariant} />
+              <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginLeft: 3, flexShrink: 1 }]} numberOfLines={1}>
+                {hasDistance ? <Text style={{ color: colors.primary, fontWeight: '600' }}>{player.distance}</Text> : null}
+                {hasDistance && cityState ? ' · ' : ''}
+                {cityState}
+              </Text>
+            </View>
+          )}
+
+          {reason && (
+            <View style={styles.row}>
+              <Sparkles size={12} color={colors.brandGreen} />
+              <Text style={[typography.labelSmall, { color: colors.brandGreen, marginLeft: 3 }]} numberOfLines={1}>
+                {reason}
               </Text>
             </View>
           )}
         </View>
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            onPress={onViewProfile}
-            style={[styles.btnOutline, { borderColor: colors.primary }]}
-            activeOpacity={0.75}
-          >
-            <Text style={[typography.labelMedium, { color: colors.primary, fontWeight: '700' }]}>
-              View Profile
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={onConnect}
-            style={[
-              styles.btnFilled,
-              { backgroundColor: player.connectionStatus === 'pending_sent' ? colors.surfaceContainerHighest : colors.primary }
-            ]}
-            activeOpacity={0.8}
-            disabled={player.connectionStatus === 'pending_sent'}
-          >
-            <Text style={[
-              typography.labelMedium,
-              { color: player.connectionStatus === 'pending_sent' ? colors.onSurfaceVariant : colors.onPrimary, fontWeight: '700' }
-            ]}>
-              {connectLabel}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        <TouchableOpacity
+          onPress={onConnect}
+          disabled={status === 'pending_sent'}
+          activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.cta, { backgroundColor: cta.filled ? colors.primary : colors.surfaceContainer }]}
+        >
+          <Text style={[typography.labelMedium, { color: cta.filled ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700' }]}>
+            {cta.label}
+          </Text>
+        </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  cardShadowWrapper: {
+  shadowWrap: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderRadius: borderRadius.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
   card: {
-    width: '100%',
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    position: 'relative',
-    padding: spacing.md,
-    paddingLeft: spacing.md + 4,
-  },
-  leftAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
   },
-  infoCol: {
+  info: {
     flex: 1,
     marginLeft: spacing.md,
-    justifyContent: 'center',
+    marginRight: spacing.sm,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  levelChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
-  },
-  ratingInline: {
+  rating: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: spacing.sm,
   },
-  scoreBadge: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
+  },
+  chip: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: borderRadius.full,
-    marginLeft: spacing.xs,
   },
-  actionsRow: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  btnOutline: {
-    flex: 1,
-    height: 40,
+  cta: {
+    minWidth: 92,
+    height: 36,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.full,
-    borderWidth: 1.5,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  btnFilled: {
-    flex: 1,
-    height: 40,
-    borderRadius: borderRadius.full,
     justifyContent: 'center',
-    alignItems: 'center',
   },
 });

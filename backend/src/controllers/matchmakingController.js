@@ -2,6 +2,7 @@ const Profile = require('../models/Profile');
 const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 const { computeMatchScore } = require('../utils/matchScore');
+const { geocodeApprox } = require('../utils/geocode');
 
 const ZIP_REGEX = /^\d{5}$/;
 
@@ -49,13 +50,34 @@ const getNearbyPlayers = async (req, res) => {
         return res.status(400).json({ success: false, message: 'zipCode must be a 5-digit US zip code' });
       }
 
-      const filter = { ...baseQuery, zipCode };
-
-      const results = await Profile.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(offsetNum)
-        .limit(limitNum + 1)
-        .lean();
+      // Resolve the zip to coordinates (offline dataset) and return players
+      // nearest-first from there, uncapped — an exact-zip match is almost
+      // always empty for a small user base. The client splits the list into
+      // "within X mi" / "further away". Unknown zips fall back to exact match.
+      const center = geocodeApprox({ zipCode });
+      let results;
+      if (center) {
+        results = await Profile.aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [center.longitude, center.latitude] },
+              distanceField: 'distanceMeters',
+              spherical: true,
+              query: baseQuery,
+              key: 'location',
+            },
+          },
+          { $sort: { distanceMeters: 1 } },
+          { $skip: offsetNum },
+          { $limit: limitNum + 1 },
+        ]);
+      } else {
+        results = await Profile.find({ ...baseQuery, zipCode })
+          .sort({ createdAt: -1 })
+          .skip(offsetNum)
+          .limit(limitNum + 1)
+          .lean();
+      }
 
       hasMore = results.length > limitNum;
       page = hasMore ? results.slice(0, limitNum) : results;

@@ -7,7 +7,8 @@
  * newest-first so nothing silently disappears.
  *
  * v2:
- *  - Personal greeting instead of a static title
+ *  - Small personal greeting shown once per day, fades out after a few
+ *    seconds or on first scroll; "Partner Posts" is the permanent title
  *  - Skeleton cards on FIRST load only; returning to the tab refreshes
  *    silently in the background (no more blank-screen spinner = no lag feel)
  *  - Pull-to-refresh
@@ -29,6 +30,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { postApi, messageApi, profileApi, getAvatarUrl } from '../../services/api';
 import { ensurePushRegistration } from '../../services/push';
 import { useAuth } from '../../context/AuthContext';
@@ -89,6 +91,9 @@ export default function HomeScreen({ navigation }: any) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [fabExtended, setFabExtended] = useState(true);
+  const [showGreeting, setShowGreeting] = useState(false);
+  const greetingOpacity = useRef(new Animated.Value(1)).current;
+  const greetingDismissed = useRef(false);
 
   const coordsRef = useRef<{ lat?: number; lng?: number }>({});
   const lastOffset = useRef(0);
@@ -100,6 +105,37 @@ export default function HomeScreen({ navigation }: any) {
   useEffect(() => {
     ensurePushRegistration();
   }, []);
+
+  // Greeting: once per user per calendar day
+  useEffect(() => {
+    if (!user?._id) return;
+    const key = `@greeting_seen_${user._id}`;
+    const today = new Date().toDateString();
+    AsyncStorage.getItem(key).then((seen) => {
+      if (seen === today) return;
+      AsyncStorage.setItem(key, today);
+      setShowGreeting(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id]);
+
+  // Start the 4s fade-out only once posts are on screen — a slow server
+  // wake-up shouldn't eat the greeting while skeletons are showing.
+  useEffect(() => {
+    if (!showGreeting || initialLoading) return;
+    const timer = setTimeout(dismissGreeting, 4000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showGreeting, initialLoading]);
+
+  const dismissGreeting = () => {
+    if (greetingDismissed.current) return;
+    greetingDismissed.current = true;
+    Animated.timing(greetingOpacity, { toValue: 0, duration: 300, useNativeDriver: false }).start(() => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setShowGreeting(false);
+    });
+  };
 
   // Skeleton pulse
   useEffect(() => {
@@ -172,6 +208,7 @@ export default function HomeScreen({ navigation }: any) {
   // Collapse FAB label while scrolling down, expand when scrolling up / near top
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
+    if (showGreeting && y > 10) dismissGreeting();
     const goingDown = y > lastOffset.current + 4;
     const goingUp = y < lastOffset.current - 4;
     lastOffset.current = y;
@@ -186,9 +223,14 @@ export default function HomeScreen({ navigation }: any) {
 
   const ListHeader = (
     <View style={styles.intro}>
-      <Text style={[typography.headlineSmall, { color: colors.onSurface, fontWeight: '700' }]}>
-        {greeting()}{firstName ? `, ${firstName}` : ''} 👋
-      </Text>
+      {showGreeting && (
+        <Animated.Text
+          style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: 2, opacity: greetingOpacity }]}
+        >
+          {greeting()}{firstName ? `, ${firstName}` : ''} 👋
+        </Animated.Text>
+      )}
+      <Text style={[typography.titleLarge, { color: colors.onSurface }]}>Partner Posts</Text>
       <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
         {initialLoading
           ? 'Finding players near you…'
@@ -196,11 +238,6 @@ export default function HomeScreen({ navigation }: any) {
             ? `${nearbyCount} ${nearbyCount === 1 ? 'player is' : 'players are'} looking for a partner`
             : 'No open posts right now'}
       </Text>
-      {!initialLoading && nearbyCount > 0 && (
-        <Text style={[typography.labelLarge, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
-          NEAREST FIRST
-        </Text>
-      )}
     </View>
   );
 
@@ -305,12 +342,7 @@ const styles = StyleSheet.create({
   },
   intro: {
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  sectionLabel: {
-    marginTop: spacing.lg,
-    fontSize: 11,
-    letterSpacing: 1,
+    paddingBottom: spacing.lg,
   },
   skeleton: {
     borderRadius: borderRadius.xl,

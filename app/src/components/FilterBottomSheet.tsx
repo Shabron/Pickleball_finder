@@ -53,12 +53,13 @@ interface FilterBottomSheetProps {
 
 // ─── Option sets ─────────────────────────────────────────────────────────────
 
-const SKILL_LEVELS = ['2.0', '2.5', '3.0', '3.5', '4.0', '4.5+'];
-const DISTANCES = ['≤ 1 mi', '≤ 3 mi', '≤ 5 mi', '≤ 10 mi', 'Any'];
+// Must match the Profile model's stored values (beginner, lowIntermediate…)
+// — the old '2.0'…'4.5+' ratings matched nothing and emptied the list.
+export const SKILL_LEVELS = ['Beginner', 'Low Intermediate', 'High Intermediate', 'Advanced', 'Professional'];
 const PLAY_STYLES = ['Singles', 'Doubles', 'Mixed', 'Any'];
 const SORT_OPTIONS = [
-  { key: 'matchScore', label: '⚡ Match Score' },
-  { key: 'distance', label: '📍 Distance' },
+  { key: 'matchScore', label: 'Best match' },
+  { key: 'distance', label: 'Closest first' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -129,7 +130,8 @@ export default function FilterBottomSheet({
   mode = 'nearby',
 }: FilterBottomSheetProps) {
   const { colors, typography } = useTheme();
-  const showDistanceControls = mode === 'nearby';
+  // Distance radius now lives on the Search screen itself; only sorting here.
+  const showDistanceControls = mode !== 'state';
 
   // Local state — committed only on "Apply"
   const [local, setLocal] = useState<FilterState>({ ...filters });
@@ -169,7 +171,6 @@ export default function FilterBottomSheet({
   const activeCount =
     local.skillLevels.length +
     local.playStyles.length +
-    (showDistanceControls && local.maxDistance !== 'Any' ? 1 : 0) +
     (showDistanceControls && local.sortBy !== 'matchScore' ? 1 : 0);
 
   const handleApply = () => {
@@ -225,7 +226,7 @@ export default function FilterBottomSheet({
           showsVerticalScrollIndicator={false}
         >
           {/* ── Skill Level ── */}
-          <SectionLabel label="🏓 Skill Level" colors={colors} typography={typography} />
+          <SectionLabel label="Skill level" colors={colors} typography={typography} />
           <ChipGroup
             options={SKILL_LEVELS}
             selected={local.skillLevels}
@@ -234,23 +235,8 @@ export default function FilterBottomSheet({
             typography={typography}
           />
 
-          {/* ── Max Distance (Nearby mode only — no distance data otherwise) ── */}
-          {showDistanceControls && (
-            <>
-              <SectionLabel label="📍 Max Distance" colors={colors} typography={typography} />
-              <ChipGroup
-                options={DISTANCES}
-                selected={[local.maxDistance]}
-                multi={false}
-                onToggle={val => setSingle('maxDistance', val)}
-                colors={colors}
-                typography={typography}
-              />
-            </>
-          )}
-
           {/* ── Play Style ── */}
-          <SectionLabel label="🎯 Play Style" colors={colors} typography={typography} />
+          <SectionLabel label="Play style" colors={colors} typography={typography} />
           <ChipGroup
             options={PLAY_STYLES}
             selected={local.playStyles}
@@ -260,7 +246,7 @@ export default function FilterBottomSheet({
           />
 
           {/* ── Sort By ── */}
-          <SectionLabel label="↕ Sort By" colors={colors} typography={typography} />
+          <SectionLabel label="Sort by" colors={colors} typography={typography} />
           <View style={styles.sortList}>
             {SORT_OPTIONS.filter(opt => showDistanceControls || opt.key !== 'distance').map(opt => {
               const active = local.sortBy === opt.key;
@@ -299,7 +285,7 @@ export default function FilterBottomSheet({
             activeOpacity={0.85}
           >
             <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '800', fontSize: 16 }]}>
-              Show {activeCount > 0 ? 'Filtered' : 'All'} Matches
+              {activeCount > 0 ? 'Apply filters' : 'Show all players'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,284 +1,457 @@
 /**
- * SearchScreen — MatchMaking (Redesigned)
+ * SearchScreen — Find players (v2)
  *
- * Features:
- *  - App header with logo + "Senior Pickleball Partners" branding
- *  - Nearby / By State / By Zip search modes
- *  - Vertical infinite-scroll FlatList of PlayerProfileCard components
- *  - onEndReached fetches the next page of nearby players from the API
+ * Never-empty strategy (small user base):
+ *  - Nearby fetches players nearest-first with no practical cap, then splits
+ *    them client-side into "Within X mi" and "Further away". If nobody is
+ *    inside the radius, the closest players are still shown.
+ *  - Zip is resolved to coordinates on the backend and works the same way.
+ *  - Whenever the primary search has no results (no location yet, no zip
+ *    entered, empty state), a nationwide list is shown underneath instead.
+ *  - Only if the whole app has no other players do we show an invite card.
+ *
+ * Performance: profile is fetched quietly on focus (no full-screen spinner
+ * after the first visit); changing the radius re-splits locally, no refetch.
  */
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
+  Animated,
+  RefreshControl,
+  Alert,
+  Share,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { SlidersHorizontal, MapPin, Search, Sparkles, ChevronRight, Users, LocateFixed } from 'lucide-react-native';
 import ScreenWrapper from '../../components/common/ScreenWrapper';
 import Header from '../../components/common/Header';
 import Dropdown from '../../components/common/Dropdown';
 import Input from '../../components/common/Input';
 import PlayerProfileCard, { PlayerProfileData } from '../../components/PlayerProfileCard';
 import FilterBottomSheet, { FilterState, DEFAULT_FILTERS } from '../../components/FilterBottomSheet';
-import LocationAutofillButton from '../../components/common/LocationAutofillButton';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, borderRadius, sizes } from '../../theme/spacing';
-import { SlidersHorizontal, MapPin, Search } from 'lucide-react-native';
+import { spacing, borderRadius } from '../../theme/spacing';
 import { matchmakingApi, messageApi, profileApi } from '../../services/api';
+import { requestLocationPermission, getCurrentCoords } from '../../services/location';
 import { US_STATES_FOR_SEARCH } from '../../constants/states';
 import { API_BASE_URL } from '@env';
 
 const AVATAR_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
-
-type SearchMode = 'nearby' | 'state' | 'zip';
+const KM_PER_MI = 1.609344;
+/** Nearby fetch radius — wide enough to cover the US so the list never runs dry. */
+const WIDE_RADIUS_KM = 5000;
+const RADII_MI = [5, 12, 25, 50];
+const PAGE = 25;
 const ZIP_REGEX = /^\d{5}$/;
 
-// ─── Component ────────────────────────────────────────────────────────────────
+type SearchMode = 'nearby' | 'state' | 'zip';
+const MODES: { key: SearchMode; label: string }[] = [
+  { key: 'nearby', label: 'Nearby' },
+  { key: 'state', label: 'By State' },
+  { key: 'zip', label: 'By Zip' },
+];
 
+// Filter chip label → stored profile value
+const SKILL_KEY: Record<string, string> = {
+  Beginner: 'beginner',
+  'Low Intermediate': 'lowIntermediate',
+  'High Intermediate': 'highIntermediate',
+  Advanced: 'advanced',
+  Professional: 'professional',
+};
+
+type Row =
+  | { kind: 'header'; key: string; title: string; count?: number }
+  | { kind: 'notice'; key: string; text: string }
+  | { kind: 'player'; key: string; player: PlayerProfileData };
+
+interface Me {
+  skillLevel?: string;
+  playStyle?: string;
+  city?: string;
+  state?: string;
+}
+
+function mapPlayer(p: any): PlayerProfileData {
+  const coords = p.location?.coordinates;
+  const mi = p.distanceKm != null ? p.distanceKm / KM_PER_MI : undefined;
+  return {
+    id: p.user?._id || p._id,
+    name: p.user?.name || 'Unknown',
+    level: p.skillLevel || '',
+    distanceMi: mi,
+    distance: mi != null ? (mi < 0.1 ? '< 0.1 mi' : `${mi < 10 ? mi.toFixed(1) : Math.round(mi)} mi`) : 'Unknown',
+    city: p.city || undefined,
+    state: p.state || undefined,
+    avatarUri: p.avatar ? `${AVATAR_BASE_URL}${p.avatar}` : undefined,
+    matchScore: p.matchScore,
+    playStyle: p.playStyle || undefined,
+    age: p.age || undefined,
+    connectionStatus: p.connectionStatus || 'none',
+    conversationId: p.conversationId,
+    coordinate: Array.isArray(coords) && coords.length === 2 ? { latitude: coords[1], longitude: coords[0] } : undefined,
+    avgRating: p.avgRating,
+    ratingCount: p.ratingCount,
+    emailVerified: p.user?.emailVerified,
+  };
+}
+
+// ─── Skeleton row ─────────────────────────────────────────────────────────────
+function SkeletonRow({ pulse }: { pulse: Animated.Value }) {
+  const { colors } = useTheme();
+  const bar = (w: string, h: number, mt = 0) => (
+    <View style={{ width: w as any, height: h, marginTop: mt, borderRadius: 6, backgroundColor: colors.surfaceContainer }} />
+  );
+  return (
+    <Animated.View style={[styles.skeleton, { backgroundColor: colors.surface, opacity: pulse }]}>
+      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceContainer }} />
+      <View style={{ flex: 1, marginLeft: spacing.md }}>
+        {bar('55%', 14)}
+        {bar('35%', 12, 8)}
+        {bar('45%', 12, 8)}
+      </View>
+      <View style={{ width: 92, height: 36, borderRadius: 18, backgroundColor: colors.surfaceContainer }} />
+    </Animated.View>
+  );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function SearchScreen({ navigation }: any) {
   const { colors, typography } = useTheme();
-  const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+
+  // Profile / context
+  const [me, setMe] = useState<Me | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [initializing, setInitializing] = useState(true);
-  const [locationMissing, setLocationMissing] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [locating, setLocating] = useState(false);
 
-  // ── Search mode (Nearby / By State / By Zip) ──────────────────────────
+  // Mode + params
   const [searchMode, setSearchMode] = useState<SearchMode>('nearby');
+  const [radiusMi, setRadiusMi] = useState(12);
   const [selectedState, setSelectedState] = useState('ALL');
   const [zipInput, setZipInput] = useState('');
   const [zipError, setZipError] = useState<string | null>(null);
   const [activeZip, setActiveZip] = useState<string | null>(null);
 
+  // Results
+  const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
+  const [fallback, setFallback] = useState<PlayerProfileData[]>([]);
+  const [fallbackLoaded, setFallbackLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const requestId = useRef(0);
+
+  // Filters
+  const [showFilter, setShowFilter] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+
+  // Segmented control pill
+  const [segWidth, setSegWidth] = useState(0);
+  const pillX = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0.5)).current;
+
+  // ── Profile: quiet refresh on every focus, no blocking spinner ──────────
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await profileApi.getProfile();
+      if (res.success && res.data) {
+        setUnreadCount(res.unreadNotificationsCount || 0);
+        const d = res.data;
+        setMe({ skillLevel: d.skillLevel, playStyle: d.playStyle, city: d.city, state: d.state });
+        const coords = d.location?.coordinates;
+        setUserLocation(prev => {
+          if (!(Array.isArray(coords) && coords.length === 2)) return prev;
+          if (prev && prev.latitude === coords[1] && prev.longitude === coords[0]) return prev;
+          return { latitude: coords[1], longitude: coords[0] };
+        });
+      }
+    } catch (e) {
+      console.warn('SearchScreen: profile load failed', e);
+    } finally {
+      setProfileLoaded(true);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const init = async () => {
-        setInitializing(true);
-        try {
-          const res = await profileApi.getProfile();
-          if (res.success && res.data) {
-            setUnreadCount(res.unreadNotificationsCount || 0);
-            const coords = res.data.location?.coordinates;
-            if (Array.isArray(coords) && coords.length === 2) {
-              // GeoJSON stores coordinates as [longitude, latitude]
-              setUserLocation({ latitude: coords[1], longitude: coords[0] });
-              setLocationMissing(false);
-            } else {
-              setUserLocation(null);
-              setLocationMissing(true);
-            }
-          } else {
-            setUserLocation(null);
-            setLocationMissing(true);
-          }
-        } catch (error) {
-          console.error('Failed to load profile/location:', error);
-          setUserLocation(null);
-          setLocationMissing(true);
-        } finally {
-          setInitializing(false);
-        }
-      };
-      init();
-    }, [])
+      loadProfile();
+    }, [loadProfile])
   );
 
-  // Re-runs the search whenever the active mode or its params change
-  // (state/zip searches don't need GPS; nearby needs userLocation).
-  useEffect(() => {
-    if (initializing) return;
-    setAllPlayers([]);
-    setHasMore(true);
-    if (searchMode === 'nearby') {
-      if (userLocation) fetchPlayers(0);
-    } else if (searchMode === 'state') {
-      fetchPlayers(0);
-    } else if (searchMode === 'zip') {
-      if (activeZip) fetchPlayers(0);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initializing, searchMode, userLocation, selectedState, activeZip]);
-
-  const fetchPlayers = async (offset = 0) => {
+  // ── Nationwide fallback (fetched once, reused everywhere) ───────────────
+  const loadFallback = useCallback(async () => {
     try {
+      const res = await matchmakingApi.getNearbyPlayers({ mode: 'state', state: 'ALL', limit: PAGE, offset: 0 });
+      if (res.success && res.data) setFallback(res.data.map(mapPlayer));
+    } catch (e) {
+      console.warn('SearchScreen: fallback load failed', e);
+    } finally {
+      setFallbackLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFallback();
+  }, [loadFallback]);
+
+  // ── Primary search ──────────────────────────────────────────────────────
+  const canSearch =
+    (searchMode === 'nearby' && !!userLocation) ||
+    searchMode === 'state' ||
+    (searchMode === 'zip' && !!activeZip);
+
+  const fetchPlayers = useCallback(
+    async (offset = 0) => {
+      if (!canSearch) return;
+      const id = ++requestId.current;
       if (offset === 0) setLoading(true);
       else setLoadingMore(true);
-
-      let res;
-      if (searchMode === 'nearby') {
-        if (!userLocation) return;
-        res = await matchmakingApi.getNearbyPlayers({
-          mode: 'nearby',
-          lat: userLocation.latitude,
-          lng: userLocation.longitude,
-          radiusKm: 20,
-          limit: 25,
-          offset,
-        });
-      } else if (searchMode === 'state') {
-        res = await matchmakingApi.getNearbyPlayers({
-          mode: 'state',
-          state: selectedState,
-          limit: 25,
-          offset,
-        });
-      } else {
-        if (!activeZip) return;
-        res = await matchmakingApi.getNearbyPlayers({
-          mode: 'zip',
-          zipCode: activeZip,
-          limit: 25,
-          offset,
-        });
-      }
-
-      if (res.success && res.data) {
-        const mappedPlayers: PlayerProfileData[] = res.data.map((p: any) => {
-          // GeoJSON stores coordinates as [longitude, latitude]
-          const coords = p.location?.coordinates;
-          const coordinate =
-            Array.isArray(coords) && coords.length === 2
-              ? { latitude: coords[1], longitude: coords[0] }
-              : undefined;
-
-          return {
-            id: p.user?._id || p._id,
-            name: p.user?.name || 'Unknown',
-            level: p.skillLevel || 'N/A',
-            distance: p.distanceKm != null ? `${(p.distanceKm * 0.621371).toFixed(1)} mi` : 'Unknown',
-            city: p.city || undefined,
-            state: p.state || undefined,
-            // avatar lives on the Profile document, not the populated user
-            // sub-object, and is stored as a relative "/uploads/..." path.
-            avatarUri: p.avatar ? `${AVATAR_BASE_URL}${p.avatar}` : undefined,
-            matchScore: p.matchScore,
-            playStyle: p.playStyle || 'Any',
-            age: p.age || undefined,
-            connectionStatus: p.connectionStatus || 'none',
-            conversationId: p.conversationId,
-            coordinate,
-            avgRating: p.avgRating,
-            ratingCount: p.ratingCount,
-            emailVerified: p.user?.emailVerified,
-          };
-        });
-        setAllPlayers(prev => (offset === 0 ? mappedPlayers : [...prev, ...mappedPlayers]));
+      try {
+        const params =
+          searchMode === 'nearby'
+            ? { mode: 'nearby' as const, lat: userLocation!.latitude, lng: userLocation!.longitude, radiusKm: WIDE_RADIUS_KM }
+            : searchMode === 'state'
+            ? { mode: 'state' as const, state: selectedState }
+            : { mode: 'zip' as const, zipCode: activeZip! };
+        const res = await matchmakingApi.getNearbyPlayers({ ...params, limit: PAGE, offset });
+        if (id !== requestId.current) return; // a newer search superseded this one
+        const mapped: PlayerProfileData[] = res.success && res.data ? res.data.map(mapPlayer) : [];
+        setAllPlayers(prev => (offset === 0 ? mapped : [...prev, ...mapped]));
         setHasMore(Boolean(res.hasMore));
-      } else if (offset === 0) {
-        setAllPlayers([]);
-        setHasMore(false);
+      } catch (e) {
+        console.warn('SearchScreen: search failed', e);
+        if (id === requestId.current && offset === 0) {
+          setAllPlayers([]);
+          setHasMore(false);
+        }
+      } finally {
+        if (id === requestId.current) {
+          setLoading(false);
+          setLoadingMore(false);
+          setSearched(true);
+        }
       }
-    } catch (error) {
-      console.error('SearchScreen: Failed to fetch players error:', error);
-      if (offset === 0) setAllPlayers([]);
+    },
+    [canSearch, searchMode, userLocation, selectedState, activeZip]
+  );
+
+  useEffect(() => {
+    if (!profileLoaded) return;
+    setAllPlayers([]);
+    setHasMore(false);
+    setSearched(false);
+    if (canSearch) fetchPlayers(0);
+    else setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileLoaded, searchMode, userLocation, selectedState, activeZip]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([loadProfile(), loadFallback(), canSearch ? fetchPlayers(0) : Promise.resolve()]);
+    setRefreshing(false);
+  }, [loadProfile, loadFallback, fetchPlayers, canSearch]);
+
+  const handleLoadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore || !canSearch) return;
+    fetchPlayers(allPlayers.length);
+  }, [loading, loadingMore, hasMore, canSearch, fetchPlayers, allPlayers.length]);
+
+  // ── Location refresh (compact button) ───────────────────────────────────
+  const refreshLocation = async () => {
+    setLocating(true);
+    try {
+      const granted = await requestLocationPermission();
+      if (!granted) {
+        Alert.alert('Location off', 'Turn on location access in Settings, or search By Zip instead.');
+        return;
+      }
+      const coords = await getCurrentCoords();
+      if (!coords) {
+        Alert.alert("Couldn't find you", 'Try again in a moment, or search By Zip instead.');
+        return;
+      }
+      setUserLocation({ latitude: coords.latitude, longitude: coords.longitude });
+      try {
+        const geo = await profileApi.reverseGeocode(coords.latitude, coords.longitude);
+        if (geo.success && geo.data) {
+          setMe(prev => ({ ...(prev || {}), city: geo.data.city || prev?.city, state: geo.data.state || prev?.state }));
+        }
+      } catch {
+        // coordinates are enough to search
+      }
     } finally {
-      if (offset === 0) setLoading(false);
-      else setLoadingMore(false);
+      setLocating(false);
     }
+  };
+
+  // ── Mode switch with sliding pill ───────────────────────────────────────
+  const modeIndex = MODES.findIndex(m => m.key === searchMode);
+  const pillW = segWidth > 0 ? (segWidth - 8) / 3 : 0;
+  useEffect(() => {
+    Animated.spring(pillX, { toValue: modeIndex * pillW, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+  }, [modeIndex, pillW, pillX]);
+
+  // ── Filtering / sorting ─────────────────────────────────────────────────
+  const activeFilterCount =
+    filters.skillLevels.length + filters.playStyles.length + (filters.sortBy !== 'matchScore' ? 1 : 0);
+
+  const applyFilters = useCallback(
+    (list: PlayerProfileData[]) => {
+      const skillKeys = filters.skillLevels.map(l => SKILL_KEY[l]).filter(Boolean);
+      const styleKeys = filters.playStyles.map(s => s.toLowerCase());
+      return list.filter(p => {
+        if (skillKeys.length && !skillKeys.includes(p.level)) return false;
+        if (styleKeys.length && !styleKeys.includes('any')) {
+          const ps = (p.playStyle || '').toLowerCase();
+          if (ps !== 'any' && !styleKeys.includes(ps)) return false;
+        }
+        return true;
+      });
+    },
+    [filters.skillLevels, filters.playStyles]
+  );
+
+  const sortList = useCallback(
+    (list: PlayerProfileData[]) => {
+      const copy = [...list];
+      if (filters.sortBy === 'distance') {
+        copy.sort((a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity));
+      } else {
+        copy.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      }
+      return copy;
+    },
+    [filters.sortBy]
+  );
+
+  const stateLabel = US_STATES_FOR_SEARCH.find(s => s.value === selectedState)?.label || 'All States (Nationwide)';
+
+  // ── Build list rows ─────────────────────────────────────────────────────
+  const { rows, playerCount, emptyKind } = useMemo(() => {
+    const out: Row[] = [];
+    const push = (ps: PlayerProfileData[]) => ps.forEach(p => out.push({ kind: 'player', key: p.id, player: p }));
+    const primary = applyFilters(allPlayers);
+    const fb = applyFilters(fallback);
+    const primaryIds = new Set(primary.map(p => p.id));
+
+    if (canSearch && primary.length > 0) {
+      const hasDist = primary.some(p => p.distanceMi != null);
+      if ((searchMode === 'nearby' || searchMode === 'zip') && hasDist) {
+        const within = sortList(primary.filter(p => (p.distanceMi ?? Infinity) <= radiusMi));
+        const further = primary.filter(p => (p.distanceMi ?? Infinity) > radiusMi); // already nearest-first
+        const where = searchMode === 'zip' ? ` of ${activeZip}` : '';
+        if (within.length) {
+          out.push({ kind: 'header', key: 'h-within', title: `Within ${radiusMi} mi${where}`, count: within.length });
+          push(within);
+        } else {
+          out.push({ kind: 'notice', key: 'n-none', text: `No players within ${radiusMi} mi yet — here are the closest ones.` });
+        }
+        if (further.length) {
+          out.push({ kind: 'header', key: 'h-further', title: within.length ? 'Further away' : 'Closest players', count: further.length });
+          push(further);
+        }
+      } else {
+        const title =
+          searchMode === 'zip' ? `Near ${activeZip}` : selectedState === 'ALL' ? 'Players across the US' : `Players in ${stateLabel}`;
+        out.push({ kind: 'header', key: 'h-primary', title, count: primary.length });
+        push(sortList(primary));
+      }
+      return { rows: out, playerCount: primary.length, emptyKind: null as null | string };
+    }
+
+    // Primary empty (or not searchable yet) → explain + nationwide fallback
+    const primaryDone = !canSearch || searched;
+    if (!primaryDone) return { rows: out, playerCount: 0, emptyKind: null };
+
+    if (canSearch && allPlayers.length > 0 && primary.length === 0) {
+      return { rows: out, playerCount: 0, emptyKind: 'filtered' };
+    }
+
+    const extras = sortList(fb.filter(p => !primaryIds.has(p.id)));
+    if (extras.length) {
+      if (canSearch) {
+        const why =
+          searchMode === 'state'
+            ? `No players in ${stateLabel} yet.`
+            : searchMode === 'zip'
+            ? `No players near ${activeZip} yet.`
+            : 'No players near you yet.';
+        out.push({ kind: 'notice', key: 'n-fb', text: `${why} Here are players across the US you can connect with.` });
+      }
+      out.push({ kind: 'header', key: 'h-fb', title: 'Players across the US', count: extras.length });
+      push(extras);
+      return { rows: out, playerCount: extras.length, emptyKind: null };
+    }
+
+    if (!fallbackLoaded) return { rows: out, playerCount: 0, emptyKind: null };
+    if (fallback.length > 0 && fb.length === 0) return { rows: out, playerCount: 0, emptyKind: 'filtered' };
+    return { rows: out, playerCount: 0, emptyKind: 'invite' };
+  }, [
+    allPlayers, fallback, fallbackLoaded, applyFilters, sortList, canSearch, searched,
+    searchMode, radiusMi, activeZip, selectedState, stateLabel,
+  ]);
+
+  // Skeleton until we have something to show (or a definitive empty state)
+  const showSkeleton = !refreshing && rows.length === 0 && !emptyKind;
+  useEffect(() => {
+    if (!showSkeleton) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.5, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [showSkeleton, pulse]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+  const updatePlayer = (id: string, patch: Partial<PlayerProfileData>) => {
+    const f = (list: PlayerProfileData[]) => list.map(p => (p.id === id ? { ...p, ...patch } : p));
+    setAllPlayers(f);
+    setFallback(f);
   };
 
   const handleConnect = async (player: PlayerProfileData) => {
     try {
       if (player.connectionStatus === 'accepted') {
-        navigation.navigate('ChatThread', {
-          conversationId: player.conversationId,
-          userId: player.id,
-          name: player.name,
-        });
+        navigation.navigate('ChatThread', { conversationId: player.conversationId, userId: player.id, name: player.name });
         return;
       }
-
       if (player.connectionStatus === 'pending_received' && player.conversationId) {
         const res = await messageApi.acceptRequest(player.conversationId);
         if (res.success) {
-          setAllPlayers(prev => prev.map(p => 
-            p.id === player.id ? { ...p, connectionStatus: 'accepted' } : p
-          ));
-          navigation.navigate('ChatThread', {
-            conversationId: player.conversationId,
-            userId: player.id,
-            name: player.name,
-          });
+          updatePlayer(player.id, { connectionStatus: 'accepted' });
+          navigation.navigate('ChatThread', { conversationId: player.conversationId, userId: player.id, name: player.name });
         }
         return;
       }
+      if (player.connectionStatus === 'pending_sent') return;
 
-      if (player.connectionStatus === 'pending_sent') {
-        return; // Already sent, do nothing
-      }
-
-      // Default: Send an automated intro message (creates pending request)
-      const res = await messageApi.sendMessage(
-        player.id,
-        "Hi! I saw you on Senior Pickleball Partners. Let's play!"
-      );
+      updatePlayer(player.id, { connectionStatus: 'pending_sent' }); // optimistic
+      const res = await messageApi.sendMessage(player.id, "Hi! I saw you on Senior Pickleball Partners. Let's play!");
       if (res.success) {
-        setAllPlayers(prev => prev.map(p => 
-          p.id === player.id ? { ...p, connectionStatus: 'pending_sent', conversationId: res.conversationId } : p
-        ));
+        updatePlayer(player.id, { connectionStatus: 'pending_sent', conversationId: res.conversationId });
       } else {
-        alert('Failed to send message: ' + res.message);
+        updatePlayer(player.id, { connectionStatus: 'none' });
+        Alert.alert("Couldn't connect", res.message || 'Please try again.');
       }
     } catch (error: any) {
-      console.error('Failed to connect:', error);
-      alert('Failed to connect: ' + error.message);
+      updatePlayer(player.id, { connectionStatus: player.connectionStatus });
+      Alert.alert("Couldn't connect", error.message || 'Please try again.');
     }
   };
-
-  // Filter state
-  const [showFilter, setShowFilter] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-
-  // Active filter count for badge
-  const activeFilterCount =
-    filters.skillLevels.length +
-    filters.playStyles.length +
-    (searchMode === 'nearby' && filters.maxDistance !== 'Any' ? 1 : 0) +
-    (searchMode === 'nearby' && filters.sortBy !== 'matchScore' ? 1 : 0);
-
-  // Apply filters + sort
-  const players = useMemo(() => {
-    let list = [...allPlayers];
-    if (filters.skillLevels.length > 0) {
-      list = list.filter(p =>
-        filters.skillLevels.some(sl =>
-          sl === '4.5+' ? parseFloat(p.level) >= 4.5 : parseFloat(sl) === parseFloat(p.level)
-        )
-      );
-    }
-    if (searchMode === 'nearby' && filters.maxDistance !== 'Any') {
-      const maxMi = parseFloat(filters.maxDistance.replace(/[^\d.]/g, ''));
-      list = list.filter(p => parseFloat(p.distance.replace(' mi', '')) <= maxMi);
-    }
-    if (filters.playStyles.length > 0) {
-      list = list.filter(p => {
-        if (!p.playStyle) return false;
-        if (filters.playStyles.includes('Any')) return true;
-        return filters.playStyles.some(s => p.playStyle!.toLowerCase().includes(s.toLowerCase()));
-      });
-    }
-    if (searchMode === 'nearby' && filters.sortBy === 'distance') {
-      list.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
-    } else {
-      list.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
-    }
-    return list;
-  }, [allPlayers, filters, searchMode]);
-
-  const handleApplyFilters = useCallback((f: FilterState) => setFilters(f), []);
-
-  const handleLoadMore = useCallback(() => {
-    if (loadingMore || loading || !hasMore) return;
-    if (searchMode === 'nearby' && !userLocation) return;
-    if (searchMode === 'zip' && !activeZip) return;
-    fetchPlayers(allPlayers.length);
-  }, [loadingMore, loading, hasMore, userLocation, allPlayers.length, searchMode, activeZip, selectedState]);
 
   const handleZipSearch = () => {
     const trimmed = zipInput.trim();
@@ -290,212 +463,227 @@ export default function SearchScreen({ navigation }: any) {
     setActiveZip(trimmed);
   };
 
-  const selectedStateLabel = US_STATES_FOR_SEARCH.find(s => s.value === selectedState)?.label || 'All States (Nationwide)';
+  const invite = () =>
+    Share.share({ message: "I'm using Senior Pickleball Partners to find people to play with — join me!" }).catch(() => {});
 
-  // ─── Search mode toggle (Nearby / By State / By Zip) ─────────────────
-  const SEARCH_MODES: { key: SearchMode; label: string }[] = [
-    { key: 'nearby', label: 'Nearby' },
-    { key: 'state', label: 'By State' },
-    { key: 'zip', label: 'By Zip' },
-  ];
+  // ── Top controls ────────────────────────────────────────────────────────
+  const locationText = me?.city
+    ? `Near ${[me.city, me.state].filter(Boolean).join(', ')}`
+    : userLocation
+    ? 'Near your location'
+    : null;
 
-  const ModeToggle = (
-    <View style={styles.modeToggleRow}>
-      {SEARCH_MODES.map(m => {
-        const active = searchMode === m.key;
-        return (
-          <TouchableOpacity
-            key={m.key}
-            onPress={() => setSearchMode(m.key)}
-            activeOpacity={0.8}
-            style={[
-              styles.modeBtn,
-              { backgroundColor: active ? colors.primary : colors.surfaceContainerHigh },
-            ]}
-          >
-            <Text
-              style={[
-                typography.labelMedium,
-                { color: active ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700' },
-              ]}
-            >
-              {m.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-
-  const ModeControl =
-    searchMode === 'state' ? (
-      <View style={styles.modeControl}>
-        <View style={styles.controlHeadingRow}>
-          <MapPin size={18} color={colors.primary} />
-          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800', marginLeft: 6 }]}>
-            Search by State
-          </Text>
-        </View>
-        <Dropdown
-          placeholder="Select a state"
-          options={US_STATES_FOR_SEARCH}
-          value={selectedState}
-          onSelect={setSelectedState}
-        />
-      </View>
-    ) : searchMode === 'zip' ? (
-      <View style={styles.modeControl}>
-        <View style={styles.controlHeadingRow}>
-          <MapPin size={18} color={colors.primary} />
-          <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800', marginLeft: 6 }]}>
-            Search by Zip Code
-          </Text>
-        </View>
-        <View style={styles.zipRow}>
-          <Input
-            placeholder="Enter a 5-digit zip code"
-            value={zipInput}
-            onChangeText={(t) => {
-              setZipInput(t);
-              if (zipError) setZipError(null);
-            }}
-            keyboardType="number-pad"
-            maxLength={5}
-            containerStyle={{ flex: 1 }}
-            onSubmitEditing={handleZipSearch}
-            returnKeyType="search"
-          />
-          <TouchableOpacity
-            onPress={handleZipSearch}
-            activeOpacity={0.8}
-            style={[styles.zipSearchBtn, { backgroundColor: colors.primary }]}
-          >
-            <Search size={22} color={colors.onPrimary} />
-          </TouchableOpacity>
-        </View>
-        {zipError && (
-          <Text style={[typography.bodySmall, { color: colors.error, marginTop: spacing.xs }]}>
-            {zipError}
-          </Text>
-        )}
-      </View>
-    ) : null;
-
-  // Live location refresh for Nearby mode — same reusable component used in
-  // onboarding/profile edit. Anchors the mode=nearby query to a fresh GPS
-  // fix instead of whatever was last saved on the profile.
-  const NearbyLocationRefresh =
-    searchMode === 'nearby' ? (
-      <View style={styles.modeControl}>
-        <LocationAutofillButton
-          label="📍 Update My Location"
-          onLocated={(result) => {
-            setUserLocation({ latitude: result.latitude, longitude: result.longitude });
-            setLocationMissing(false);
-          }}
-        />
-      </View>
-    ) : null;
-
-  // ─── Top controls (mode toggle, mode-specific control) ────────────────
-  const TopControls = (
+  const Controls = (
     <View>
-      {ModeToggle}
-      {ModeControl}
-      {NearbyLocationRefresh}
+      {/* Segmented control */}
+      <View
+        style={[styles.segment, { backgroundColor: colors.surfaceContainerHigh }]}
+        onLayout={(e: LayoutChangeEvent) => setSegWidth(e.nativeEvent.layout.width)}
+      >
+        {pillW > 0 && (
+          <Animated.View
+            style={[styles.segPill, { width: pillW, backgroundColor: colors.surface, transform: [{ translateX: pillX }] }]}
+          />
+        )}
+        {MODES.map(m => {
+          const active = m.key === searchMode;
+          return (
+            <Pressable key={m.key} style={styles.segItem} onPress={() => setSearchMode(m.key)}>
+              <Text
+                style={[
+                  typography.labelLarge,
+                  { color: active ? colors.primary : colors.onSurfaceVariant, fontWeight: active ? '700' : '500' },
+                ]}
+              >
+                {m.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
-      {/* ── Match count + filter button ── */}
-      <View style={styles.sectionRow}>
-        <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '800' }]}>
-          {players.length} match{players.length !== 1 ? 'es' : ''} found
+      {/* Mode-specific control */}
+      {searchMode === 'nearby' && (
+        <View style={styles.block}>
+          <View style={styles.locRow}>
+            <MapPin size={16} color={colors.primary} />
+            <Text style={[typography.bodyMedium, { color: colors.onSurface, marginLeft: 6, flex: 1 }]} numberOfLines={1}>
+              {locationText || 'Location not set'}
+            </Text>
+            <TouchableOpacity
+              onPress={refreshLocation}
+              disabled={locating}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.locBtn, { backgroundColor: colors.primaryContainer }]}
+              activeOpacity={0.8}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <LocateFixed size={14} color={colors.primary} />
+                  <Text style={[typography.labelMedium, { color: colors.primary, marginLeft: 4, fontWeight: '600' }]}>
+                    {userLocation ? 'Update' : 'Use my location'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          {userLocation && (
+            <View style={styles.radiusRow}>
+              {RADII_MI.map(r => {
+                const active = r === radiusMi;
+                return (
+                  <Pressable
+                    key={r}
+                    onPress={() => setRadiusMi(r)}
+                    style={[styles.radiusChip, { backgroundColor: active ? colors.primary : colors.surface }]}
+                  >
+                    <Text
+                      style={[
+                        typography.labelMedium,
+                        { color: active ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: active ? '700' : '500' },
+                      ]}
+                    >
+                      {r} mi
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+
+      {searchMode === 'state' && (
+        <View style={styles.block}>
+          <Dropdown placeholder="Select a state" options={US_STATES_FOR_SEARCH} value={selectedState} onSelect={setSelectedState} />
+        </View>
+      )}
+
+      {searchMode === 'zip' && (
+        <View style={styles.block}>
+          <View style={styles.zipRow}>
+            <Input
+              placeholder="5-digit zip code"
+              value={zipInput}
+              onChangeText={t => {
+                setZipInput(t);
+                if (zipError) setZipError(null);
+              }}
+              keyboardType="number-pad"
+              maxLength={5}
+              containerStyle={{ flex: 1, marginBottom: 0 }}
+              onSubmitEditing={handleZipSearch}
+              returnKeyType="search"
+            />
+            <TouchableOpacity onPress={handleZipSearch} activeOpacity={0.8} style={[styles.zipBtn, { backgroundColor: colors.primary }]}>
+              <Search size={20} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+          {zipError && <Text style={[typography.bodySmall, { color: colors.error, marginTop: spacing.xs }]}>{zipError}</Text>}
+        </View>
+      )}
+
+      {/* Skill-level prompt */}
+      {me && !me.skillLevel && (
+        <Pressable
+          onPress={() => navigation.navigate('EditProfile')}
+          style={[styles.prompt, { backgroundColor: colors.brandGreenContainer }]}
+        >
+          <Sparkles size={16} color={colors.brandGreen} />
+          <Text style={[typography.bodySmall, { color: colors.onBrandGreenContainer, flex: 1, marginLeft: spacing.sm }]}>
+            Add your skill level for better matches
+          </Text>
+          <ChevronRight size={16} color={colors.brandGreen} />
+        </Pressable>
+      )}
+
+      {/* Count + filter */}
+      <View style={styles.countRow}>
+        <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant }]}>
+          {showSkeleton ? 'Finding players…' : playerCount > 0 ? `${playerCount} player${playerCount === 1 ? '' : 's'}` : ' '}
         </Text>
         <TouchableOpacity
-          style={[styles.filterBtn, { backgroundColor: activeFilterCount > 0 ? colors.primary : colors.primaryContainer }]}
-          activeOpacity={0.7}
+          style={[styles.filterBtn, { backgroundColor: activeFilterCount ? colors.primary : colors.surface }]}
+          activeOpacity={0.8}
           onPress={() => setShowFilter(true)}
         >
-          <SlidersHorizontal size={18} color={activeFilterCount > 0 ? colors.onPrimary : colors.primary} />
-          <Text style={[typography.labelMedium, { color: activeFilterCount > 0 ? colors.onPrimary : colors.primary, marginLeft: 5, fontWeight: '600' }]}>
-            Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          <SlidersHorizontal size={15} color={activeFilterCount ? colors.onPrimary : colors.primary} />
+          <Text
+            style={[
+              typography.labelMedium,
+              { color: activeFilterCount ? colors.onPrimary : colors.primary, marginLeft: 5, fontWeight: '600' },
+            ]}
+          >
+            Filter{activeFilterCount ? ` · ${activeFilterCount}` : ''}
           </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // ─── Footer spinner / end message ──────────────────────────────────
-  const ListFooter = loadingMore ? (
-    <View style={styles.footerLoader}>
-      <ActivityIndicator size="small" color={colors.primary} />
-      <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: spacing.sm }]}>
-        Finding more players…
-      </Text>
-    </View>
-  ) : !hasMore && allPlayers.length > 0 ? (
-    <View style={styles.footerLoader}>
-      <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
-        🎉 You've seen all the matches!
-      </Text>
-    </View>
-  ) : null;
+  // ── Row renderer ────────────────────────────────────────────────────────
+  const renderItem = ({ item }: { item: Row }) => {
+    if (item.kind === 'header') {
+      return (
+        <View style={styles.sectionHeader}>
+          <Text style={[typography.labelLarge, { color: colors.onSurface, fontWeight: '700' }]}>{item.title}</Text>
+          {item.count != null && (
+            <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginLeft: 6 }]}>{item.count}</Text>
+          )}
+        </View>
+      );
+    }
+    if (item.kind === 'notice') {
+      return (
+        <View style={[styles.notice, { backgroundColor: colors.primaryContainer }]}>
+          <Text style={[typography.bodySmall, { color: colors.onPrimaryContainer }]}>{item.text}</Text>
+        </View>
+      );
+    }
+    return (
+      <PlayerProfileCard
+        player={item.player}
+        me={me || undefined}
+        onConnect={() => handleConnect(item.player)}
+        onViewProfile={() => navigation.navigate('UserProfile', { userId: item.player.id })}
+      />
+    );
+  };
 
-  // ─── Empty state (varies by mode) ─────────────────────────────────────
-  const ListEmpty = loading ? null : (
-    <View style={styles.emptyState}>
-      <MapPin size={40} color={colors.onSurfaceVariant} />
-      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.md, textAlign: 'center' }]}>
-        {searchMode === 'zip' && !activeZip
-          ? 'Enter a zip code above and tap Search to find players.'
-          : searchMode === 'state'
-          ? `No players found ${selectedState === 'ALL' ? 'nationwide' : `in ${selectedStateLabel}`} yet.`
-          : searchMode === 'zip'
-          ? `No players found near zip ${activeZip}.`
-          : 'No players found nearby yet.'}
+  const ListEmpty = showSkeleton ? (
+    <View>
+      <SkeletonRow pulse={pulse} />
+      <SkeletonRow pulse={pulse} />
+      <SkeletonRow pulse={pulse} />
+      <SkeletonRow pulse={pulse} />
+    </View>
+  ) : emptyKind === 'filtered' ? (
+    <View style={styles.empty}>
+      <SlidersHorizontal size={36} color={colors.onSurfaceVariant} />
+      <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.md }]}>No players match these filters</Text>
+      <TouchableOpacity onPress={() => setFilters(DEFAULT_FILTERS)} style={[styles.emptyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
+        <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>Clear filters</Text>
+      </TouchableOpacity>
+    </View>
+  ) : (
+    <View style={styles.empty}>
+      <Users size={40} color={colors.primary} />
+      <Text style={[typography.titleSmall, { color: colors.onSurface, marginTop: spacing.md, textAlign: 'center' }]}>
+        You're one of our first players!
       </Text>
+      <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: spacing.xs, textAlign: 'center' }]}>
+        Invite a friend you play with, or post on Home so new players can find you.
+      </Text>
+      <TouchableOpacity onPress={invite} style={[styles.emptyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.85}>
+        <Text style={[typography.labelLarge, { color: colors.onPrimary, fontWeight: '700' }]}>Invite a friend</Text>
+      </TouchableOpacity>
     </View>
   );
 
-  if (initializing) {
-    return (
-      <ScreenWrapper>
-        <Header showLogo showNotificationBell notificationCount={unreadCount} />
-        <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </ScreenWrapper>
-    );
-  }
-
-  if (searchMode === 'nearby' && locationMissing) {
-    return (
-      <ScreenWrapper>
-        <Header showLogo showNotificationBell notificationCount={unreadCount} />
-        {ModeToggle}
-        <View style={styles.centerState}>
-          <MapPin size={48} color={colors.primary} />
-          <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '800', marginTop: spacing.lg, textAlign: 'center' }]}>
-            Add your location
-          </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.sm, textAlign: 'center' }]}>
-            We need your city, state, or zip code to show you pickleball players nearby — or switch to "By State" or "By Zip" above.
-          </Text>
-          <TouchableOpacity
-            style={[styles.completeProfileBtn, { backgroundColor: colors.primary }]}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <Text style={[typography.labelMedium, { color: colors.onPrimary, fontWeight: '700' }]}>
-              Complete Profile
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScreenWrapper>
-    );
-  }
-
   return (
     <ScreenWrapper>
-      {/* ── App header with logo ── */}
       <Header
         showLogo
         showNotificationBell
@@ -503,32 +691,29 @@ export default function SearchScreen({ navigation }: any) {
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
 
-      {TopControls}
-
       <FlatList
-        style={{ flex: 1 }}
-        data={players}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <PlayerProfileCard
-            player={item}
-            onConnect={() => handleConnect(item)}
-            onViewProfile={() => navigation.navigate('UserProfile', { userId: item.id })}
-          />
-        )}
-        ListFooterComponent={ListFooter}
+        data={rows}
+        keyExtractor={item => item.key}
+        renderItem={renderItem}
+        ListHeaderComponent={Controls}
         ListEmptyComponent={ListEmpty}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: spacing.lg }} color={colors.primary} /> : null}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.4}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.flatListContent}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
+        }
+        initialNumToRender={8}
+        windowSize={7}
       />
 
-      {/* ── Filter Bottom Sheet ── */}
       <FilterBottomSheet
         visible={showFilter}
         filters={filters}
-        onApply={handleApplyFilters}
+        onApply={setFilters}
         onClose={() => setShowFilter(false)}
         mode={searchMode}
       />
@@ -537,76 +722,134 @@ export default function SearchScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  flatListContent: {
-    paddingBottom: 100,
+  listContent: {
+    paddingBottom: spacing.xxl,
   },
-  modeToggleRow: {
+  segment: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: 4,
+    borderRadius: borderRadius.full,
   },
-  modeBtn: {
+  segPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: borderRadius.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segItem: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  block: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+    height: 30,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    marginLeft: spacing.sm,
+  },
+  radiusRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  radiusChip: {
+    flex: 1,
+    height: 32,
     borderRadius: borderRadius.full,
     alignItems: 'center',
-  },
-  modeControl: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  controlHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+    justifyContent: 'center',
   },
   zipRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  zipSearchBtn: {
-    width: sizes.touchTarget,
-    height: sizes.touchTarget,
+  zipBtn: {
+    width: 48,
+    height: 48,
     borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.massive,
-  },
-  sectionRow: {
+  prompt: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 32,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  notice: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+    borderRadius: borderRadius.md,
   },
-  footerLoader: {
+  skeleton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
   },
-  centerState: {
-    flex: 1,
+  emptyBtn: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    height: 44,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  completeProfileBtn: {
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.full,
   },
 });
