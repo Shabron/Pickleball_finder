@@ -32,20 +32,25 @@ const getNearbyPlayers = async (req, res) => {
 
     let page;
     let hasMore;
+    let total = null;
 
     if (mode === 'state') {
       const filter = { ...baseQuery };
       if (state && state !== 'ALL') filter.state = state;
 
-      const results = await Profile.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(offsetNum)
-        // Fetch one extra record to detect whether another page exists.
-        .limit(limitNum + 1)
-        .lean();
+      const [results, totalCount] = await Promise.all([
+        Profile.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(offsetNum)
+          // Fetch one extra record to detect whether another page exists.
+          .limit(limitNum + 1)
+          .lean(),
+        Profile.countDocuments(filter),
+      ]);
 
       hasMore = results.length > limitNum;
       page = hasMore ? results.slice(0, limitNum) : results;
+      total = totalCount;
     } else if (mode === 'zip') {
       if (!zipCode || !ZIP_REGEX.test(String(zipCode))) {
         return res.status(400).json({ success: false, message: 'zipCode must be a 5-digit US zip code' });
@@ -58,26 +63,37 @@ const getNearbyPlayers = async (req, res) => {
       const center = geocodeApprox({ zipCode });
       let results;
       if (center) {
-        results = await Profile.aggregate([
-          {
-            $geoNear: {
-              near: { type: 'Point', coordinates: [center.longitude, center.latitude] },
-              distanceField: 'distanceMeters',
-              spherical: true,
-              query: baseQuery,
-              key: 'location',
+        const [geoResults, totalCount] = await Promise.all([
+          Profile.aggregate([
+            {
+              $geoNear: {
+                near: { type: 'Point', coordinates: [center.longitude, center.latitude] },
+                distanceField: 'distanceMeters',
+                spherical: true,
+                query: baseQuery,
+                key: 'location',
+              },
             },
-          },
-          { $sort: { distanceMeters: 1 } },
-          { $skip: offsetNum },
-          { $limit: limitNum + 1 },
+            { $sort: { distanceMeters: 1 } },
+            { $skip: offsetNum },
+            { $limit: limitNum + 1 },
+          ]),
+          Profile.countDocuments(baseQuery),
         ]);
+        results = geoResults;
+        total = totalCount;
       } else {
-        results = await Profile.find({ ...baseQuery, zipCode })
-          .sort({ createdAt: -1 })
-          .skip(offsetNum)
-          .limit(limitNum + 1)
-          .lean();
+        const zipFilter = { ...baseQuery, zipCode };
+        const [findResults, totalCount] = await Promise.all([
+          Profile.find(zipFilter)
+            .sort({ createdAt: -1 })
+            .skip(offsetNum)
+            .limit(limitNum + 1)
+            .lean(),
+          Profile.countDocuments(zipFilter),
+        ]);
+        results = findResults;
+        total = totalCount;
       }
 
       hasMore = results.length > limitNum;
@@ -100,25 +116,29 @@ const getNearbyPlayers = async (req, res) => {
 
       const maxDistanceMeters = radiusKmNum * 1000;
 
-      const results = await Profile.aggregate([
-        {
-          $geoNear: {
-            near: { type: 'Point', coordinates: [lngNum, latNum] },
-            distanceField: 'distanceMeters',
-            spherical: true,
-            maxDistance: maxDistanceMeters,
-            query: baseQuery,
-            key: 'location',
+      const [results, totalCount] = await Promise.all([
+        Profile.aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [lngNum, latNum] },
+              distanceField: 'distanceMeters',
+              spherical: true,
+              maxDistance: maxDistanceMeters,
+              query: baseQuery,
+              key: 'location',
+            },
           },
-        },
-        { $sort: { distanceMeters: 1 } },
-        { $skip: offsetNum },
-        // Fetch one extra record to detect whether another page exists.
-        { $limit: limitNum + 1 },
+          { $sort: { distanceMeters: 1 } },
+          { $skip: offsetNum },
+          // Fetch one extra record to detect whether another page exists.
+          { $limit: limitNum + 1 },
+        ]),
+        Profile.countDocuments(baseQuery),
       ]);
 
       hasMore = results.length > limitNum;
       page = hasMore ? results.slice(0, limitNum) : results;
+      total = totalCount;
     }
 
     // Hydrate + populate user details for client display. Drop orphaned
@@ -161,6 +181,10 @@ const getNearbyPlayers = async (req, res) => {
         };
       }),
       hasMore,
+      // Total number of matching profiles in the DB (before pagination).
+      // Used by the client to display the real player count even when
+      // results are paginated.
+      total,
       // Based on the raw DB page size (before dropping orphaned profiles
       // above) so pagination stays aligned with what's actually been
       // consumed from the collection.

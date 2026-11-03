@@ -143,6 +143,7 @@ export default function SearchScreen({ navigation }: any) {
 
   // Results
   const [allPlayers, setAllPlayers] = useState<PlayerProfileData[]>([]);
+  const [totalPlayerCount, setTotalPlayerCount] = useState<number | null>(null);
   const [fallback, setFallback] = useState<PlayerProfileData[]>([]);
   const [fallbackLoaded, setFallbackLoaded] = useState(false);
   const [fallbackError, setFallbackError] = useState(false);
@@ -245,6 +246,11 @@ export default function SearchScreen({ navigation }: any) {
         const mapped: PlayerProfileData[] = res.success && res.data ? res.data.map(mapPlayer) : [];
         setAllPlayers(prev => (offset === 0 ? mapped : [...prev, ...mapped]));
         setHasMore(Boolean(res.hasMore));
+        // Capture the real total count from the backend (only on first page load
+        // so it doesn't flicker as subsequent pages load).
+        if (offset === 0 && res.total != null) {
+          setTotalPlayerCount(res.total);
+        }
       } catch (e) {
         console.warn('SearchScreen: search failed', e);
         if (id === requestId.current && offset === 0) {
@@ -267,6 +273,7 @@ export default function SearchScreen({ navigation }: any) {
     setAllPlayers([]);
     setHasMore(false);
     setSearched(false);
+    setTotalPlayerCount(null);
     if (canSearch) fetchPlayers(0);
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -383,7 +390,7 @@ export default function SearchScreen({ navigation }: any) {
         out.push({ kind: 'header', key: 'h-primary', title });
         push(sortList(primary));
       }
-      return { rows: out, playerCount: primary.length, emptyKind: null as null | string };
+      return { rows: out, playerCount: totalPlayerCount ?? primary.length, emptyKind: null as null | string };
     }
 
     // Primary empty (or not searchable yet) → explain + nationwide fallback
@@ -415,7 +422,7 @@ export default function SearchScreen({ navigation }: any) {
     // Only claim "no players" when the server actually said so
     return { rows: out, playerCount: 0, emptyKind: fallbackError ? 'error' : 'invite' };
   }, [
-    allPlayers, fallback, fallbackLoaded, fallbackError, applyFilters, sortList, canSearch, searched,
+    allPlayers, totalPlayerCount, fallback, fallbackLoaded, fallbackError, applyFilters, sortList, canSearch, searched,
     searchMode, radiusMi, activeZip, selectedState, stateLabel,
   ]);
 
